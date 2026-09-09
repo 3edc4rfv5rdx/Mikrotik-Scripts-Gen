@@ -53,6 +53,8 @@ A_IPADDR=10.255.0.1/30
 A_ENDPOINT=office.example.com
 # Networks routed into the tunnel, comma-separated (quote if spaced). Empty for none.
 A_ROUTE_TO_B=192.168.20.0/24
+# Add check-gateway=ping to the routes.
+A_CHECK_GATEWAY=no
 # Emit input/forward rules.
 A_FIREWALL=no
 
@@ -64,6 +66,7 @@ B_IPADDR=10.255.0.2/30
 # Public address. Empty if behind NAT.
 B_ENDPOINT=my.home-prov.net
 B_ROUTE_TO_A=192.168.10.0/24
+B_CHECK_GATEWAY=yes
 B_FIREWALL=yes
 EOF
 }
@@ -167,8 +170,10 @@ done
 
 KEEPALIVE=25s MTU=
 A_PRIVATE_KEY= B_PRIVATE_KEY= PRESHARED_KEY=
-A_NAME= A_IFACE= A_PORT=13231 A_IPADDR= A_ENDPOINT= A_ROUTE_TO_B= A_FIREWALL=no
-B_NAME= B_IFACE= B_PORT=13231 B_IPADDR= B_ENDPOINT= B_ROUTE_TO_A= B_FIREWALL=no
+A_NAME= A_IFACE= A_PORT=13231 A_IPADDR= A_ENDPOINT= A_ROUTE_TO_B=
+A_CHECK_GATEWAY=no A_FIREWALL=no
+B_NAME= B_IFACE= B_PORT=13231 B_IPADDR= B_ENDPOINT= B_ROUTE_TO_A=
+B_CHECK_GATEWAY=no B_FIREWALL=no
 # shellcheck source=/dev/null
 . "$CONF"
 
@@ -240,11 +245,14 @@ TAG="wg-gen: $A_NAME-$B_NAME"
 
 # emit_side <name> <iface> <privkey> <port> <address> <firewall> \
 #           <peer name> <peer pubkey> <peer ip> <peer endpoint> <peer port> \
-#           <file> <routes>
+#           <file> <routes> <check-gateway>
 emit_side() {
     local name=$1 iface=$2 priv=$3 port=$4 address=$5 firewall=$6
     local peer_name=$7 peer_pub=$8 peer_ip=$9 peer_endpoint=${10} peer_port=${11}
-    local file=${12} net
+    local file=${12} check_gw=${14} net extra=
+    if is_yes "$check_gw"; then
+        extra=" check-gateway=ping"
+    fi
     local -a routes
     IFS=, read -ra routes <<<"${13}"
 
@@ -297,8 +305,8 @@ emit_side() {
         for net in "${routes[@]}"; do
             net=${net// /}
             [[ $net ]] || continue
-            printf 'add dst-address=%s gateway="%s" comment="%s to %s"\n' \
-                "$net" "$iface" "$TAG" "$peer_name"
+            printf 'add dst-address=%s gateway=%s%s comment="%s to %s"\n' \
+                "$net" "$peer_ip" "$extra" "$TAG" "$peer_name"
         done
     fi
 
@@ -336,9 +344,9 @@ B_FILE="$OUT_DIR/sideB-$B_NAME.rsc"
 
 umask 077
 emit_side "$A_NAME" "$A_IFACE" "$A_PRIVATE_KEY" "$A_PORT" "$A_IPADDR" "$A_FIREWALL" \
-    "$B_NAME" "$B_PUBLIC_KEY" "$B_TUNNEL_IP" "$B_ENDPOINT" "$B_PORT" "${A_FILE##*/}" "$A_ROUTE_TO_B" > "$A_FILE"
+    "$B_NAME" "$B_PUBLIC_KEY" "$B_TUNNEL_IP" "$B_ENDPOINT" "$B_PORT" "${A_FILE##*/}" "$A_ROUTE_TO_B" "$A_CHECK_GATEWAY" > "$A_FILE"
 emit_side "$B_NAME" "$B_IFACE" "$B_PRIVATE_KEY" "$B_PORT" "$B_IPADDR" "$B_FIREWALL" \
-    "$A_NAME" "$A_PUBLIC_KEY" "$A_TUNNEL_IP" "$A_ENDPOINT" "$A_PORT" "${B_FILE##*/}" "$B_ROUTE_TO_A" > "$B_FILE"
+    "$A_NAME" "$A_PUBLIC_KEY" "$A_TUNNEL_IP" "$A_ENDPOINT" "$A_PORT" "${B_FILE##*/}" "$B_ROUTE_TO_A" "$B_CHECK_GATEWAY" > "$B_FILE"
 
 # Keep the input next to what it produced.
 if [[ $(readlink -f "$CONF") != $(readlink -f "$OUT_DIR/${CONF##*/}") ]]; then

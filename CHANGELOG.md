@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Routes use the peer's tunnel IP as gateway, with optional `check-gateway=ping` via `*_CHECK_GATEWAY`.
 - WireGuard peers get a `name` of `peer-<other side>`.
 - The generated `.rsc` removes itself by name pattern, so it also works when the file sits in `flash/`.
 - Per-side routing: `A_ROUTE_TO_B` / `B_ROUTE_TO_A` list the networks routed into the tunnel.
