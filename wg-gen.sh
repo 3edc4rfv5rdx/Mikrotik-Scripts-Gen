@@ -2,8 +2,8 @@
 # RouterOS .rsc pair for a WireGuard site-to-site tunnel.
 set -euo pipefail
 
-OUT_DIR=./out
-DEFAULT_CONF=./site.conf
+OUT_DIR=
+DEFAULT_CONF=./wg-gen.conf
 CONF=
 
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
@@ -11,16 +11,16 @@ have() { command -v "$1" >/dev/null 2>&1; }
 
 usage() {
     cat <<'EOF'
-Usage: WG-gen.sh [-o OUTDIR] [CONFIG]
-       WG-gen.sh --example > site.conf
+Usage: wg-gen.sh [-o OUTDIR] [CONFIG]
+       wg-gen.sh --example > wg-gen.conf
 
-CONFIG defaults to ./site.conf.
+CONFIG defaults to ./wg-gen.conf.
 
 Generates OUTDIR/sideA.rsc and OUTDIR/sideB.rsc, ready for /import on the
 matching MikroTik router.
 
 Options:
-  -o, --out DIR   output directory (default: ./out)
+  -o, --out DIR   output directory (default: ./out-<A_NAME>-<B_NAME>)
       --example   print a commented sample config and exit
   -h, --help      this help
 EOF
@@ -28,7 +28,7 @@ EOF
 
 print_example() {
     cat <<'EOF'
-# Generator input, sourced by WG-gen.sh: shell quoting applies.
+# Generator input, sourced by wg-gen.sh: shell quoting applies.
 
 # Keepalive for the dialing side. Empty disables.
 KEEPALIVE=25s
@@ -222,18 +222,19 @@ A_PUBLIC_KEY=$(wg_pubkey "$A_PRIVATE_KEY")
 B_PUBLIC_KEY=$(wg_pubkey "$B_PRIVATE_KEY")
 [[ $A_PUBLIC_KEY != "$B_PUBLIC_KEY" ]] || die "both sides ended up with the same key pair"
 
-TAG="WGGEN:$A_NAME-$B_NAME"
+TAG="wg-gen: $A_NAME-$B_NAME"
 
 # ---------- emitter ----------
 
 # emit_side <name> <iface> <privkey> <port> <address> <firewall> \
-#           <peer name> <peer pubkey> <peer ip> <peer endpoint> <peer port>
+#           <peer name> <peer pubkey> <peer ip> <peer endpoint> <peer port> <file>
 emit_side() {
     local name=$1 iface=$2 priv=$3 port=$4 address=$5 firewall=$6
     local peer_name=$7 peer_pub=$8 peer_ip=$9 peer_endpoint=${10} peer_port=${11}
+    local file=${12}
 
     echo "# WireGuard site-to-site, $name side (peer: $peer_name)."
-    echo "# WG-gen.sh, $(date '+%Y-%m-%d %H:%M:%S %z'). Re-import replaces only"
+    echo "# wg-gen.sh, $(date '+%Y-%m-%d %H:%M:%S %z'). Re-import replaces only"
     printf '# objects tagged "%s".\n' "$TAG"
     echo
     printf ':log info "%s: importing %s configuration";\n' "$TAG" "$name"
@@ -283,17 +284,27 @@ emit_side() {
         printf '    comment="%s forward to %s"\n' "$TAG" "$peer_name"
         printf 'move [find comment~"%s"] 0\n' "$TAG"
     fi
+
+    echo
+    echo "# This file holds the private key, drop it once imported."
+    printf '/file remove [find name="%s"]\n' "$file"
 }
 
+: "${OUT_DIR:=./out-$A_NAME-$B_NAME}"
 mkdir -p "$OUT_DIR"
 A_FILE="$OUT_DIR/sideA.rsc"
 B_FILE="$OUT_DIR/sideB.rsc"
 
 umask 077
 emit_side "$A_NAME" "$A_IFACE" "$A_PRIVATE_KEY" "$A_PORT" "$A_IPADDR" "$A_FIREWALL" \
-    "$B_NAME" "$B_PUBLIC_KEY" "$B_TUNNEL_IP" "$B_ENDPOINT" "$B_PORT" > "$A_FILE"
+    "$B_NAME" "$B_PUBLIC_KEY" "$B_TUNNEL_IP" "$B_ENDPOINT" "$B_PORT" sideA.rsc > "$A_FILE"
 emit_side "$B_NAME" "$B_IFACE" "$B_PRIVATE_KEY" "$B_PORT" "$B_IPADDR" "$B_FIREWALL" \
-    "$A_NAME" "$A_PUBLIC_KEY" "$A_TUNNEL_IP" "$A_ENDPOINT" "$A_PORT" > "$B_FILE"
+    "$A_NAME" "$A_PUBLIC_KEY" "$A_TUNNEL_IP" "$A_ENDPOINT" "$A_PORT" sideB.rsc > "$B_FILE"
+
+# Keep the input next to what it produced.
+if [[ $(readlink -f "$CONF") != $(readlink -f "$OUT_DIR/${CONF##*/}") ]]; then
+    cp -- "$CONF" "$OUT_DIR/"
+fi
 
 cat >&2 <<EOF
 A  $A_NAME  $A_IPADDR  pub $A_PUBLIC_KEY  -> $A_FILE
