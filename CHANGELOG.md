@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Added `dual-wan-failover.md`: recursive-route failover between two uplinks under one tunnel.
 - Routes use the peer's tunnel IP as gateway, with optional `check-gateway=ping` via `*_CHECK_GATEWAY`.
 - WireGuard peers get a `name` of `peer-<other side>`.
 - The generated `.rsc` removes itself by name pattern, so it also works when the file sits in `flash/`.
