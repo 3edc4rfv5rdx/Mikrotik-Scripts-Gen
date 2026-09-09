@@ -272,7 +272,8 @@ emit_side() {
     echo
 
     echo "/interface/wireguard/peers"
-    printf 'add interface="%s" public-key="%s" \\\n' "$iface" "$peer_pub"
+    printf 'add interface="%s" name="peer-%s" public-key="%s" \\\n' \
+        "$iface" "$peer_name" "$peer_pub"
     if [[ $PRESHARED_KEY ]]; then
         printf '    preshared-key="%s" \\\n' "$PRESHARED_KEY"
     fi
@@ -323,8 +324,9 @@ emit_side() {
     fi
 
     echo
-    echo "# This file holds the private key, drop it once imported."
-    printf '/file remove [find name="%s"]\n' "$file"
+    echo "# The file holds the private key, drop it once imported. Matched by"
+    echo "# pattern: on a flash-backed router the name is flash/<file>."
+    printf '/file remove [find name~"%s"]\n' "$file"
 }
 
 : "${OUT_DIR:=./out-$A_NAME-$B_NAME}"
