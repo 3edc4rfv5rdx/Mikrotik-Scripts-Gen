@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Added `DualWanB.sh`: generates the dual-WAN failover `.rsc` (recursive probes, two defaults with `check-gateway=ping`, optional masquerade) plus its undo file.
+- Probe addresses are 8.8.4.4 and 1.0.0.1, in the script and in the note.
 - Separate `removeA-`/`removeB-` files undo an import: they drop every tagged object, whatever the side was generated with.
 - Added `dual-wan-failover.md`: recursive-route failover between two uplinks under one tunnel.
 - Routes use the peer's tunnel IP as gateway, with optional `check-gateway=ping` via `*_CHECK_GATEWAY`.

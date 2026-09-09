@@ -6,10 +6,10 @@
 ## Рецепт
 
 ```
-/ip/route add dst-address=8.8.8.8/32 gateway=<gw-оптики> scope=10
-/ip/route add dst-address=1.1.1.1/32 gateway=<gw-lte>    scope=10
-/ip/route add dst-address=0.0.0.0/0 gateway=8.8.8.8 target-scope=11 distance=1 check-gateway=ping
-/ip/route add dst-address=0.0.0.0/0 gateway=1.1.1.1 target-scope=11 distance=2 check-gateway=ping
+/ip/route add dst-address=8.8.4.4/32 gateway=<gw-оптики> scope=10
+/ip/route add dst-address=1.0.0.1/32 gateway=<gw-lte>    scope=10
+/ip/route add dst-address=0.0.0.0/0 gateway=8.8.4.4 target-scope=11 distance=1 check-gateway=ping
+/ip/route add dst-address=0.0.0.0/0 gateway=1.0.0.1 target-scope=11 distance=2 check-gateway=ping
 ```
 
 Пробники обязаны быть разные: с одним адресом проверка пойдёт по уже активному
@@ -27,7 +27,7 @@
 Маршрут со `scope` больше, чем `target-scope` у ищущего, не используется для
 резолва next-hop. По умолчанию: connected — 10, статические — 30, динамические —
 40, `target-scope=10` (то есть только через connected). Поэтому пробному `/32`
-ставим `scope=10`, а default route — `target-scope=11`, иначе 8.8.8.8 как шлюз
+ставим `scope=10`, а default route — `target-scope=11`, иначе 8.8.4.4 как шлюз
 не разрешится.
 
 ## Туннель
