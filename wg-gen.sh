@@ -16,8 +16,8 @@ Usage: wg-gen.sh [-o OUTDIR] [CONFIG]
 
 CONFIG defaults to ./wg-gen.conf.
 
-Generates OUTDIR/sideA.rsc and OUTDIR/sideB.rsc, ready for /import on the
-matching MikroTik router.
+Generates OUTDIR/sideA-<A_NAME>.rsc and OUTDIR/sideB-<B_NAME>.rsc, ready for
+/import on the matching MikroTik router.
 
 Options:
   -o, --out DIR   output directory (default: ./out-<A_NAME>-<B_NAME>)
@@ -51,6 +51,8 @@ A_PORT=13231
 A_IPADDR=10.255.0.1/30
 # Public address. Empty if behind NAT.
 A_ENDPOINT=office.example.com
+# Networks routed into the tunnel, comma-separated (quote if spaced). Empty for none.
+A_ROUTE_TO_B=192.168.20.0/24
 # Emit input/forward rules.
 A_FIREWALL=no
 
@@ -61,6 +63,7 @@ B_PORT=13231
 B_IPADDR=10.255.0.2/30
 # Public address. Empty if behind NAT.
 B_ENDPOINT=my.home-prov.net
+B_ROUTE_TO_A=192.168.10.0/24
 B_FIREWALL=yes
 EOF
 }
@@ -164,8 +167,8 @@ done
 
 KEEPALIVE=25s MTU=
 A_PRIVATE_KEY= B_PRIVATE_KEY= PRESHARED_KEY=
-A_NAME= A_IFACE= A_PORT=13231 A_IPADDR= A_ENDPOINT= A_FIREWALL=no
-B_NAME= B_IFACE= B_PORT=13231 B_IPADDR= B_ENDPOINT= B_FIREWALL=no
+A_NAME= A_IFACE= A_PORT=13231 A_IPADDR= A_ENDPOINT= A_ROUTE_TO_B= A_FIREWALL=no
+B_NAME= B_IFACE= B_PORT=13231 B_IPADDR= B_ENDPOINT= B_ROUTE_TO_A= B_FIREWALL=no
 # shellcheck source=/dev/null
 . "$CONF"
 
@@ -193,6 +196,15 @@ B_TUNNEL_IP=${B_IPADDR%/*}
 [[ ${A_IPADDR#*/} == "${B_IPADDR#*/}" && \
    $(cidr_net_int "$A_IPADDR") == "$(cidr_net_int "$B_IPADDR")" ]] \
     || die "A_IPADDR and B_IPADDR must sit in the same subnet"
+
+for var in A_ROUTE_TO_B B_ROUTE_TO_A; do
+    IFS=, read -ra nets <<<"${!var}"
+    for net in "${nets[@]}"; do
+        net=${net// /}
+        [[ $net ]] || continue
+        is_cidr "$net" || die "$var contains a bad network: $net"
+    done
+done
 
 for var in A_PORT B_PORT; do
     [[ ${!var} =~ ^[0-9]+$ ]] && (( ${!var} >= 1 && ${!var} <= 65535 )) \
@@ -227,11 +239,14 @@ TAG="wg-gen: $A_NAME-$B_NAME"
 # ---------- emitter ----------
 
 # emit_side <name> <iface> <privkey> <port> <address> <firewall> \
-#           <peer name> <peer pubkey> <peer ip> <peer endpoint> <peer port> <file>
+#           <peer name> <peer pubkey> <peer ip> <peer endpoint> <peer port> \
+#           <file> <routes>
 emit_side() {
     local name=$1 iface=$2 priv=$3 port=$4 address=$5 firewall=$6
     local peer_name=$7 peer_pub=$8 peer_ip=$9 peer_endpoint=${10} peer_port=${11}
-    local file=${12}
+    local file=${12} net
+    local -a routes
+    IFS=, read -ra routes <<<"${13}"
 
     echo "# WireGuard site-to-site, $name side (peer: $peer_name)."
     echo "# wg-gen.sh, $(date '+%Y-%m-%d %H:%M:%S %z'). Re-import replaces only"
@@ -241,6 +256,9 @@ emit_side() {
     echo
     if is_yes "$firewall"; then
         printf '/ip/firewall/filter remove [find comment~"%s"]\n' "$TAG"
+    fi
+    if [[ ${13} ]]; then
+        printf '/ip/route remove [find comment~"%s"]\n' "$TAG"
     fi
     printf '/ip/address remove [find comment~"%s"]\n' "$TAG"
     printf '/interface/wireguard/peers remove [find comment~"%s"]\n' "$TAG"
@@ -272,17 +290,36 @@ emit_side() {
     printf 'add interface="%s" address=%s comment="%s tunnel address"\n' \
         "$iface" "$address" "$TAG"
 
+    if [[ ${13} ]]; then
+        echo
+        echo "/ip/route"
+        for net in "${routes[@]}"; do
+            net=${net// /}
+            [[ $net ]] || continue
+            printf 'add dst-address=%s gateway="%s" comment="%s to %s"\n' \
+                "$net" "$iface" "$TAG" "$peer_name"
+        done
+    fi
+
     if is_yes "$firewall"; then
         echo
-        echo "# Appended, then moved to the top so no drop rule shadows them."
+        echo "# Forward rules come in disabled, at the end of the chain."
         echo "/ip/firewall/filter"
-        printf 'add chain=input action=accept protocol=udp dst-port=%s \\\n' "$port"
-        printf '    comment="%s accept wireguard"\n' "$TAG"
-        printf 'add chain=forward action=accept in-interface="%s" \\\n' "$iface"
+        printf 'add chain=forward action=accept in-interface="%s" disabled=yes \\\n' "$iface"
         printf '    comment="%s forward from %s"\n' "$TAG" "$peer_name"
-        printf 'add chain=forward action=accept out-interface="%s" \\\n' "$iface"
+        printf 'add chain=forward action=accept out-interface="%s" disabled=yes \\\n' "$iface"
         printf '    comment="%s forward to %s"\n' "$TAG" "$peer_name"
-        printf 'move [find comment~"%s"] 0\n' "$TAG"
+        echo
+        echo "# The input rule goes in front of the defconf drop; if that rule is not"
+        echo "# there, it lands at the end of the chain and has to be moved by hand."
+        echo ':local anchor [/ip/firewall/filter find chain=input action=drop in-interface-list="!LAN"]'
+        echo ':if ([:len $anchor] > 0) do={'
+        printf '    /ip/firewall/filter add chain=input action=accept protocol=udp dst-port=%s disabled=yes \\\n' "$port"
+        printf '        comment="%s accept wireguard" place-before=[:pick $anchor 0]\n' "$TAG"
+        echo '} else={'
+        printf '    /ip/firewall/filter add chain=input action=accept protocol=udp dst-port=%s disabled=yes \\\n' "$port"
+        printf '        comment="%s accept wireguard"\n' "$TAG"
+        echo '}'
     fi
 
     echo
@@ -292,14 +329,14 @@ emit_side() {
 
 : "${OUT_DIR:=./out-$A_NAME-$B_NAME}"
 mkdir -p "$OUT_DIR"
-A_FILE="$OUT_DIR/sideA.rsc"
-B_FILE="$OUT_DIR/sideB.rsc"
+A_FILE="$OUT_DIR/sideA-$A_NAME.rsc"
+B_FILE="$OUT_DIR/sideB-$B_NAME.rsc"
 
 umask 077
 emit_side "$A_NAME" "$A_IFACE" "$A_PRIVATE_KEY" "$A_PORT" "$A_IPADDR" "$A_FIREWALL" \
-    "$B_NAME" "$B_PUBLIC_KEY" "$B_TUNNEL_IP" "$B_ENDPOINT" "$B_PORT" sideA.rsc > "$A_FILE"
+    "$B_NAME" "$B_PUBLIC_KEY" "$B_TUNNEL_IP" "$B_ENDPOINT" "$B_PORT" "${A_FILE##*/}" "$A_ROUTE_TO_B" > "$A_FILE"
 emit_side "$B_NAME" "$B_IFACE" "$B_PRIVATE_KEY" "$B_PORT" "$B_IPADDR" "$B_FIREWALL" \
-    "$A_NAME" "$A_PUBLIC_KEY" "$A_TUNNEL_IP" "$A_ENDPOINT" "$A_PORT" sideB.rsc > "$B_FILE"
+    "$A_NAME" "$A_PUBLIC_KEY" "$A_TUNNEL_IP" "$A_ENDPOINT" "$A_PORT" "${B_FILE##*/}" "$B_ROUTE_TO_A" > "$B_FILE"
 
 # Keep the input next to what it produced.
 if [[ $(readlink -f "$CONF") != $(readlink -f "$OUT_DIR/${CONF##*/}") ]]; then
@@ -310,5 +347,5 @@ cat >&2 <<EOF
 A  $A_NAME  $A_IPADDR  pub $A_PUBLIC_KEY  -> $A_FILE
 B  $B_NAME  $B_IPADDR  pub $B_PUBLIC_KEY  -> $B_FILE
 
-Upload each file to its router and run: /import file=sideA.rsc (resp. sideB.rsc)
+Upload each file to its router and run: /import file=<name>.rsc
 EOF
