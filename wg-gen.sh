@@ -17,7 +17,8 @@ Usage: wg-gen.sh [-o OUTDIR] [CONFIG]
 CONFIG defaults to ./wg-gen.conf.
 
 Generates OUTDIR/sideA-<A_NAME>.rsc and OUTDIR/sideB-<B_NAME>.rsc, ready for
-/import on the matching MikroTik router.
+/import on the matching MikroTik router, plus removeA-/removeB- files that
+undo the import.
 
 Options:
   -o, --out DIR   output directory (default: ./out-<A_NAME>-<B_NAME>)
@@ -244,6 +245,40 @@ TAG="wg-gen: $A_NAME-$B_NAME"
 
 # ---------- emitter ----------
 
+# emit_cleanup <firewall> <routes>: drops everything carrying the tag.
+emit_cleanup() {
+    if is_yes "$1"; then
+        printf '/ip/firewall/filter remove [find comment~"%s"]\n' "$TAG"
+    fi
+    if [[ $2 ]]; then
+        printf '/ip/route remove [find comment~"%s"]\n' "$TAG"
+    fi
+    printf '/ip/address remove [find comment~"%s"]\n' "$TAG"
+    printf '/interface/wireguard/peers remove [find comment~"%s"]\n' "$TAG"
+    printf '/interface/wireguard remove [find comment~"%s"]\n' "$TAG"
+}
+
+# emit_self_remove <file>: the name is matched by pattern, since on a
+# flash-backed router the file is called flash/<file>.
+emit_self_remove() {
+    printf '/file remove [find name~"%s"]\n' "$1"
+}
+
+# emit_remove <name> <peer name> <file>: an undo covers every menu, whatever
+# this side was generated with, so emit_cleanup runs with both flags on.
+emit_remove() {
+    echo "# WireGuard site-to-site, $1 side: undo of the $2 tunnel."
+    echo "# wg-gen.sh, $(date '+%Y-%m-%d %H:%M:%S %z')."
+    printf '# Removes every object tagged "%s" and nothing else.\n' "$TAG"
+    echo
+    printf ':log info "%s: removing %s configuration";\n' "$TAG" "$1"
+    echo
+    emit_cleanup yes yes
+    echo
+    echo "# Drop this file once imported."
+    emit_self_remove "$3"
+}
+
 # emit_side <name> <iface> <privkey> <port> <address> <firewall> \
 #           <peer name> <peer pubkey> <peer ip> <peer endpoint> <peer port> \
 #           <file> <routes> <check-gateway>
@@ -263,15 +298,7 @@ emit_side() {
     echo
     printf ':log info "%s: importing %s configuration";\n' "$TAG" "$name"
     echo
-    if is_yes "$firewall"; then
-        printf '/ip/firewall/filter remove [find comment~"%s"]\n' "$TAG"
-    fi
-    if [[ ${13} ]]; then
-        printf '/ip/route remove [find comment~"%s"]\n' "$TAG"
-    fi
-    printf '/ip/address remove [find comment~"%s"]\n' "$TAG"
-    printf '/interface/wireguard/peers remove [find comment~"%s"]\n' "$TAG"
-    printf '/interface/wireguard remove [find comment~"%s"]\n' "$TAG"
+    emit_cleanup "$firewall" "${13}"
     echo
 
     echo "/interface/wireguard"
@@ -333,21 +360,25 @@ emit_side() {
     fi
 
     echo
-    echo "# The file holds the private key, drop it once imported. Matched by"
-    echo "# pattern: on a flash-backed router the name is flash/<file>."
-    printf '/file remove [find name~"%s"]\n' "$file"
+    echo "# The file holds the private key, drop it once imported."
+    emit_self_remove "$file"
 }
 
 : "${OUT_DIR:=./out-$A_NAME-$B_NAME}"
 mkdir -p "$OUT_DIR"
 A_FILE="$OUT_DIR/sideA-$A_NAME.rsc"
 B_FILE="$OUT_DIR/sideB-$B_NAME.rsc"
+A_UNDO="$OUT_DIR/removeA-$A_NAME.rsc"
+B_UNDO="$OUT_DIR/removeB-$B_NAME.rsc"
 
 umask 077
 emit_side "$A_NAME" "$A_IFACE" "$A_PRIVATE_KEY" "$A_PORT" "$A_IPADDR" "$A_FIREWALL" \
     "$B_NAME" "$B_PUBLIC_KEY" "$B_TUNNEL_IP" "$B_ENDPOINT" "$B_PORT" "${A_FILE##*/}" "$A_ROUTE_TO_B" "$A_CHECK_GATEWAY" > "$A_FILE"
 emit_side "$B_NAME" "$B_IFACE" "$B_PRIVATE_KEY" "$B_PORT" "$B_IPADDR" "$B_FIREWALL" \
     "$A_NAME" "$A_PUBLIC_KEY" "$A_TUNNEL_IP" "$A_ENDPOINT" "$A_PORT" "${B_FILE##*/}" "$B_ROUTE_TO_A" "$B_CHECK_GATEWAY" > "$B_FILE"
+
+emit_remove "$A_NAME" "$B_NAME" "${A_UNDO##*/}" > "$A_UNDO"
+emit_remove "$B_NAME" "$A_NAME" "${B_UNDO##*/}" > "$B_UNDO"
 
 # Keep the input next to what it produced.
 if [[ $(readlink -f "$CONF") != $(readlink -f "$OUT_DIR/${CONF##*/}") ]]; then
@@ -357,6 +388,7 @@ fi
 cat >&2 <<EOF
 A  $A_NAME  $A_IPADDR  pub $A_PUBLIC_KEY  -> $A_FILE
 B  $B_NAME  $B_IPADDR  pub $B_PUBLIC_KEY  -> $B_FILE
+undo                                        -> $A_UNDO, $B_UNDO
 
 Upload each file to its router and run: /import file=<name>.rsc
 EOF

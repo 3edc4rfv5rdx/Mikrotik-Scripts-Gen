@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Separate `removeA-`/`removeB-` files undo an import: they drop every tagged object, whatever the side was generated with.
 - Added `dual-wan-failover.md`: recursive-route failover between two uplinks under one tunnel.
 - Routes use the peer's tunnel IP as gateway, with optional `check-gateway=ping` via `*_CHECK_GATEWAY`.
 - WireGuard peers get a `name` of `peer-<other side>`.
