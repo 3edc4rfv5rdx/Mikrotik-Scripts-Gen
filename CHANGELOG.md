@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- The `DualWanB.sh` undo finds taken-over DHCP clients by the tag in their script, whatever the current config says.
 - The `DualWanB.sh` undo header says it also hands back the DHCP clients it took over.
 - The foreign default-route warning only counts enabled routes in `main`, so policy-routing tables no longer trigger it.
 - RouterOS locals in the generated files live inside `{ }` blocks, so nothing relies on `/import` keeping a top-level `:local` between lines.

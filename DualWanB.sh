@@ -297,7 +297,7 @@ emit_config() {
 }
 
 emit_remove() {
-    local file=$1 n iface_var
+    local file=$1
 
     echo "# Dual-WAN failover on $ROUTER: undo."
     echo "# DualWanB.sh, $(date '+%Y-%m-%d %H:%M:%S %z')."
@@ -306,14 +306,11 @@ emit_remove() {
     echo
     printf ':log info "%s: removing";\n' "$TAG"
     echo
-    for n in 1 2; do
-        is_dhcp "$n" || continue
-        iface_var=WAN${n}_IFACE
-        echo "# Give the DHCP client its default route back before ours go."
-        printf '/ip/dhcp-client set [find interface="%s" script~"%s "] script="" add-default-route=yes\n' \
-            "${!iface_var}" "$TAG"
-        echo
-    done
+    echo "# Give the DHCP clients their default route back before ours go. Found by"
+    echo "# the tag in their script, so a client taken over by an earlier config is"
+    echo "# handed back too."
+    printf '/ip/dhcp-client set [find script~"%s "] script="" add-default-route=yes\n' "$TAG"
+    echo
     emit_cleanup
     echo
     echo "# Drop this file once imported."
