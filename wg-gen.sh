@@ -53,7 +53,7 @@ PSK=no
 A_NAME=office
 
 # WireGuard interface on this router. If empty = wg-$B_NAME.
-A_IFACE=wg-home
+A_IFACE=
 
 # Listen port. If empty = $PORT.
 A_PORT=
@@ -81,7 +81,7 @@ A_FIREWALL=no
 B_NAME=home
 
 # WireGuard interface on this router. If empty = wg-$A_NAME.
-B_IFACE=wg-office
+B_IFACE=
 
 # Listen port. If empty = $PORT.
 B_PORT=

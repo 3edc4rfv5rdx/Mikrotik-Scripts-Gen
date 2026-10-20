@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- The sample leaves `A_IFACE`/`B_IFACE` empty, so they default to `wg-<peer name>`.
 - Endpoint comments in the sample say whose address it is: the router itself, dialled by the peer.
 - `*_ENDPOINT`, `MTU` and `KEEPALIVE` are validated before generation instead of failing at `/import`.
 - Output files carry both names, own first (`sideA-<A>-<B>.rsc`), so a hub router gets one file per tunnel.
