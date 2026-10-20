@@ -35,18 +35,22 @@ print_example() {
 ROUTER=home
 
 # DHCP, PPPoE and LTE clients on both WANs need add-default-route=no, or their
-# own default route breaks the failover.
+# own default route breaks the failover. With GATEWAY=dhcp the generated file
+# sets it itself; any other client needs it by hand.
 
 # ---- WAN 1, primary ----
 WAN1_NAME=fiber
 # Next hop. Ethernet/fibre: the provider's gateway IP. Point-to-point links
 # (LTE, PPPoE, L2TP): the interface name. Pin one to the other as IP%iface.
+# "dhcp": follow the gateway the DHCP client on WAN1_IFACE gets; its script
+# keeps the probe route up to date.
 WAN1_GATEWAY=192.0.2.1
 # Probe address pinned to this uplink. Must differ from the other one. All
 # traffic to it goes only through this uplink, so do not use it as a DNS server.
 WAN1_PROBE=8.8.4.4
 WAN1_DISTANCE=1
-# Interface for masquerade. Empty skips NAT for this uplink.
+# Uplink interface: masquerade goes out of it, and with GATEWAY=dhcp its DHCP
+# client is the one taken over. Empty skips NAT; not allowed with dhcp.
 WAN1_IFACE=ether1
 
 # ---- WAN 2, backup ----
@@ -131,17 +135,21 @@ done
 (( 10#$WAN1_DISTANCE < 10#$WAN2_DISTANCE )) \
     || die "WAN1_DISTANCE must be below WAN2_DISTANCE: equal ones load-balance, a higher one makes WAN1 the backup"
 
-# IP, interface, or IP%interface; a typo would only surface at /import.
-for var in WAN1_GATEWAY WAN2_GATEWAY; do
+# IP, interface, IP%interface or dhcp; a typo would only surface at /import.
+for n in 1 2; do
+    var=WAN${n}_GATEWAY iface_var=WAN${n}_IFACE
     gw=${!var}
-    if [[ $gw == *%* ]]; then
+    if [[ $gw == dhcp ]]; then
+        [[ ${!iface_var} =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]] \
+            || die "$var=dhcp needs $iface_var, the interface its DHCP client runs on"
+    elif [[ $gw == *%* ]]; then
         is_ipv4 "${gw%%%*}" && [[ ${gw#*%} =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]] \
             || die "$var must be IP%interface, got '$gw'"
     elif [[ $gw =~ ^[0-9.]+$ ]]; then
         is_ipv4 "$gw" || die "$var is not a valid IPv4 address: '$gw'"
     else
         [[ $gw =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]] \
-            || die "$var must be an IP, an interface or IP%interface, got '$gw'"
+            || die "$var must be an IP, an interface, IP%interface or dhcp, got '$gw'"
     fi
 done
 
@@ -161,8 +169,52 @@ emit_self_remove() {
     printf '/file remove [find name~"%s"]\n' "$1"
 }
 
+is_dhcp() { local -n gw=WAN$1_GATEWAY; [[ $gw == dhcp ]]; }
+
+# The script a taken-over DHCP client runs on every lease: it points the probe
+# route at the gateway just handed out, and puts the route back with scope=10
+# if someone removed it. Escaped for a RouterOS string.
+dhcp_script() {
+    local -n name=WAN$1_NAME probe=WAN$1_PROBE
+    local comment="$TAG probe via $name" raw bs='\' q='"' d='$'
+    printf -v raw ':if ($bound=1) do={:local r [/ip/route find comment="%s"]; :if ([:len $r]=0) do={/ip/route add dst-address=%s/32 gateway=$"gateway-address" scope=10 comment="%s"} else={/ip/route set $r gateway=$"gateway-address"}}' \
+        "$comment" "$probe" "$comment"
+    raw=${raw//"$bs"/"$bs$bs"}
+    raw=${raw//"$q"/"$bs$q"}
+    raw=${raw//"$d"/"$bs$d"}
+    printf '%s' "$raw"
+}
+
+# emit_dhcp_check <n>: aborts the import before anything is touched when the
+# DHCP client is missing or already runs a script of its own.
+emit_dhcp_check() {
+    local -n iface=WAN$1_IFACE
+    printf ':local dc%s [/ip/dhcp-client find interface="%s"]\n' "$1" "$iface"
+    printf ':if ([:len $dc%s] != 1) do={ :error "%s: expected one DHCP client on %s" }\n' \
+        "$1" "$TAG" "$iface"
+    printf ':local old%s [/ip/dhcp-client get $dc%s script]\n' "$1" "$1"
+    printf ':if ($old%s != "" && !($old%s ~ "%s ")) do={ :error "%s: the DHCP client on %s already has a script, merge it by hand" }\n' \
+        "$1" "$1" "$TAG" "$TAG" "$iface"
+}
+
+# emit_probe <n>: the /32 that pins the probe to its uplink. With dhcp the
+# gateway comes from the current lease; until there is one the interface
+# stands in, and the client script fixes it on bound.
+emit_probe() {
+    local -n name=WAN$1_NAME gw=WAN$1_GATEWAY probe=WAN$1_PROBE iface=WAN$1_IFACE
+    if is_dhcp "$1"; then
+        printf ':local gw%s [:tostr [/ip/dhcp-client get $dc%s gateway]]\n' "$1" "$1"
+        printf ':if ([:len $gw%s] = 0) do={ :set gw%s "%s" }\n' "$1" "$1" "$iface"
+        printf '/ip/route add dst-address=%s/32 gateway=$gw%s scope=10 comment="%s probe via %s"\n' \
+            "$probe" "$1" "$TAG" "$name"
+    else
+        printf '/ip/route add dst-address=%s/32 gateway=%s scope=10 comment="%s probe via %s"\n' \
+            "$probe" "$gw" "$TAG" "$name"
+    fi
+}
+
 emit_config() {
-    local file=$1
+    local file=$1 n
 
     echo "# Dual-WAN failover on $ROUTER: $WAN1_NAME primary, $WAN2_NAME backup."
     echo "# DualWanB.sh, $(date '+%Y-%m-%d %H:%M:%S %z'). Re-import replaces only"
@@ -174,15 +226,22 @@ emit_config() {
     echo
     printf ':log info "%s: importing";\n' "$TAG"
     echo
+    if is_dhcp 1 || is_dhcp 2; then
+        echo "# DHCP clients taken over below."
+        for n in 1 2; do
+            is_dhcp "$n" && emit_dhcp_check "$n"
+        done
+        echo
+    fi
     emit_cleanup
     echo
 
-    echo "/ip/route"
     echo "# Probes, each pinned to its own uplink."
-    printf 'add dst-address=%s/32 gateway=%s scope=10 comment="%s probe via %s"\n' \
-        "$WAN1_PROBE" "$WAN1_GATEWAY" "$TAG" "$WAN1_NAME"
-    printf 'add dst-address=%s/32 gateway=%s scope=10 comment="%s probe via %s"\n' \
-        "$WAN2_PROBE" "$WAN2_GATEWAY" "$TAG" "$WAN2_NAME"
+    for n in 1 2; do
+        emit_probe "$n"
+    done
+    echo
+    echo "/ip/route"
     echo "# Defaults, resolved recursively through the probes above."
     printf 'add dst-address=0.0.0.0/0 gateway=%s target-scope=11 distance=%s \\\n' \
         "$WAN1_PROBE" "$WAN1_DISTANCE"
@@ -190,6 +249,14 @@ emit_config() {
     printf 'add dst-address=0.0.0.0/0 gateway=%s target-scope=11 distance=%s \\\n' \
         "$WAN2_PROBE" "$WAN2_DISTANCE"
     printf '    check-gateway=ping comment="%s via %s"\n' "$TAG" "$WAN2_NAME"
+
+    for n in 1 2; do
+        is_dhcp "$n" || continue
+        echo
+        echo "# The client stops adding its own default route and keeps the probe"
+        echo "# route on the current gateway."
+        printf '/ip/dhcp-client set $dc%s add-default-route=no script="%s"\n' "$n" "$(dhcp_script "$n")"
+    done
 
     if is_yes "$MASQUERADE" && [[ $WAN1_IFACE || $WAN2_IFACE ]]; then
         echo
@@ -218,7 +285,7 @@ emit_config() {
 }
 
 emit_remove() {
-    local file=$1
+    local file=$1 n iface_var
 
     echo "# Dual-WAN failover on $ROUTER: undo."
     echo "# DualWanB.sh, $(date '+%Y-%m-%d %H:%M:%S %z')."
@@ -226,6 +293,14 @@ emit_remove() {
     echo
     printf ':log info "%s: removing";\n' "$TAG"
     echo
+    for n in 1 2; do
+        is_dhcp "$n" || continue
+        iface_var=WAN${n}_IFACE
+        echo "# Give the DHCP client its default route back before ours go."
+        printf '/ip/dhcp-client set [find interface="%s" script~"%s "] script="" add-default-route=yes\n' \
+            "${!iface_var}" "$TAG"
+        echo
+    done
     emit_cleanup
     echo
     echo "# Drop this file once imported."

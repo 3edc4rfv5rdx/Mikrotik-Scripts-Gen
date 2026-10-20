@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- `WAN*_GATEWAY=dhcp` takes over the DHCP client on `WAN*_IFACE`: no own default route, and a lease script that keeps the probe route on the current gateway.
 - The `DualWanB.sh` sample keeps the `add-default-route=no` note as its own block instead of under `ROUTER`.
 - `DualWanB.sh` sample notes that the probe address is reachable only through its uplink.
 - `DualWanB.sh` validates the gateways and requires `WAN1_DISTANCE` below `WAN2_DISTANCE`.
