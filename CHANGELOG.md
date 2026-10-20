@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- `dual-wan-failover.md` walks through the path of a packet over the primary uplink.
 - The `DualWanB.sh` header warns that a re-import leaves the router without a default route for a few seconds.
 - `DualWanB.sh` waits 2s before the foreign default-route check when it took over a DHCP client, so its vanishing route is not reported.
 - `DualWanB.sh` refuses the same interface for both uplinks.
