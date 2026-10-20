@@ -244,6 +244,21 @@ done
 [[ $A_ENDPOINT || $B_ENDPOINT ]] \
     || die "at least one of A_ENDPOINT / B_ENDPOINT must be set, otherwise neither side can dial"
 
+# A typo here would only surface at /import on the router.
+for var in A_ENDPOINT B_ENDPOINT; do
+    [[ -z ${!var} || ${!var} =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] \
+        || die "$var must be a hostname or an IPv4 address, got '${!var}'"
+    if [[ ${!var} =~ ^[0-9.]+$ ]]; then
+        is_ipv4 "${!var}" || die "$var is not a valid IPv4 address: '${!var}'"
+    fi
+done
+
+[[ -z $MTU || ( $MTU =~ ^[0-9]+$ && 10#$MTU -ge 1280 && 10#$MTU -le 65535 ) ]] \
+    || die "MTU must be empty or 1280..65535, got '$MTU'"
+
+[[ -z $KEEPALIVE || $KEEPALIVE =~ ^[0-9]+[smh]?$ ]] \
+    || die "KEEPALIVE must be empty or a time like 25s, got '$KEEPALIVE'"
+
 # ---------- key material ----------
 
 A_PRIVATE_KEY=$(wg_genkey)
