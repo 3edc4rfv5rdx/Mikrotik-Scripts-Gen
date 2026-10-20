@@ -163,6 +163,9 @@ done
 (( 10#$WAN1_DISTANCE < 10#$WAN2_DISTANCE )) \
     || die "WAN1_DISTANCE must be below WAN2_DISTANCE: equal ones load-balance, a higher one makes WAN1 the backup"
 
+[[ -z $WAN1_IFACE || $WAN1_IFACE != "$WAN2_IFACE" ]] \
+    || die "WAN1_IFACE and WAN2_IFACE must differ, got '$WAN1_IFACE' for both"
+
 # IP, interface, IP%interface or dhcp; a typo would only surface at /import.
 for n in 1 2; do
     var=WAN${n}_GATEWAY iface_var=WAN${n}_IFACE
