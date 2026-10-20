@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Ports with leading zeros are read as decimal and written to the `.rsc` without them.
 - The note on keeping `:local` inside `{ }` moved from the generated `.rsc` into the generator source.
 - `DualWanB.conf` refreshed to the restyled sample.
 - `dual-wan-failover.md` walks through the path of a packet over the primary uplink.

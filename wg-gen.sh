@@ -239,8 +239,10 @@ done
 : "${A_PORT:=$PORT}"
 : "${B_PORT:=$PORT}"
 for var in A_PORT B_PORT; do
-    [[ ${!var} =~ ^[0-9]+$ ]] && (( ${!var} >= 1 && ${!var} <= 65535 )) \
+    [[ ${!var} =~ ^[0-9]+$ ]] && (( 10#${!var} >= 1 && 10#${!var} <= 65535 )) \
         || die "$var must be a UDP port, got '${!var}'"
+    # Drop leading zeros, so the .rsc carries a plain number.
+    printf -v "$var" '%d' "$(( 10#${!var} ))"
 done
 
 [[ $A_ENDPOINT || $B_ENDPOINT ]] \
