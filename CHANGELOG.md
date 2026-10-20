@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- `DualWanB.sh` validates the gateways and requires `WAN1_DISTANCE` below `WAN2_DISTANCE`.
 - `DualWanB.sh` explains why foreign default routes break failover and warns at import when one is present.
 - `DualWanB.sh --example` writes the sample to the config file, moving an existing one to `.bak`.
 - `DualWanB.sh` cleanup matches the tag anchored as `^<tag> `, so `home` no longer catches `home2`.

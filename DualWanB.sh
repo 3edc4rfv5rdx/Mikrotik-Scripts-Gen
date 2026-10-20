@@ -126,8 +126,22 @@ for var in WAN1_DISTANCE WAN2_DISTANCE; do
     [[ ${!var} =~ ^[0-9]+$ ]] && (( ${!var} >= 1 && ${!var} <= 255 )) \
         || die "$var must be 1..255, got '${!var}'"
 done
-[[ $WAN1_DISTANCE != "$WAN2_DISTANCE" ]] \
-    || die "the distances must differ, otherwise RouterOS load-balances instead of failing over"
+(( 10#$WAN1_DISTANCE < 10#$WAN2_DISTANCE )) \
+    || die "WAN1_DISTANCE must be below WAN2_DISTANCE: equal ones load-balance, a higher one makes WAN1 the backup"
+
+# IP, interface, or IP%interface; a typo would only surface at /import.
+for var in WAN1_GATEWAY WAN2_GATEWAY; do
+    gw=${!var}
+    if [[ $gw == *%* ]]; then
+        is_ipv4 "${gw%%%*}" && [[ ${gw#*%} =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]] \
+            || die "$var must be IP%interface, got '$gw'"
+    elif [[ $gw =~ ^[0-9.]+$ ]]; then
+        is_ipv4 "$gw" || die "$var is not a valid IPv4 address: '$gw'"
+    else
+        [[ $gw =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]] \
+            || die "$var must be an IP, an interface or IP%interface, got '$gw'"
+    fi
+done
 
 TAG="dualwan: $ROUTER"
 
