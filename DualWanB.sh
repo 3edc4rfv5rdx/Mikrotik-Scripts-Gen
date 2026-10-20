@@ -41,7 +41,8 @@ WAN1_NAME=fiber
 # Next hop. Ethernet/fibre: the provider's gateway IP. Point-to-point links
 # (LTE, PPPoE, L2TP): the interface name. Pin one to the other as IP%iface.
 WAN1_GATEWAY=192.0.2.1
-# Probe address pinned to this uplink. Must differ from the other one.
+# Probe address pinned to this uplink. Must differ from the other one. All
+# traffic to it goes only through this uplink, so do not use it as a DNS server.
 WAN1_PROBE=8.8.4.4
 WAN1_DISTANCE=1
 # Interface for masquerade. Empty skips NAT for this uplink.

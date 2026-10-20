@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- `DualWanB.sh` sample notes that the probe address is reachable only through its uplink.
 - `DualWanB.sh` validates the gateways and requires `WAN1_DISTANCE` below `WAN2_DISTANCE`.
 - `DualWanB.sh` explains why foreign default routes break failover and warns at import when one is present.
 - `DualWanB.sh --example` writes the sample to the config file, moving an existing one to `.bak`.
