@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- The `DualWanB.sh` sample keeps the `add-default-route=no` note as its own block instead of under `ROUTER`.
 - `DualWanB.sh` sample notes that the probe address is reachable only through its uplink.
 - `DualWanB.sh` validates the gateways and requires `WAN1_DISTANCE` below `WAN2_DISTANCE`.
 - `DualWanB.sh` explains why foreign default routes break failover and warns at import when one is present.

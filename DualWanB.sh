@@ -32,9 +32,10 @@ print_example() {
 # Generator input, sourced by DualWanB.sh: shell quoting applies.
 
 # Router this belongs to; only names the tag and the files.
+ROUTER=home
+
 # DHCP, PPPoE and LTE clients on both WANs need add-default-route=no, or their
 # own default route breaks the failover.
-ROUTER=home
 
 # ---- WAN 1, primary ----
 WAN1_NAME=fiber
