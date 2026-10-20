@@ -44,7 +44,10 @@ PORT=13231
 # Generate a preshared key for the pair: yes or no.
 PSK=no
 
-# ---- side A ----
+##############################
+# Side A
+##############################
+
 # Router name: goes into the tag, the file names and the peer name.
 # Letters, digits, "_" and "-".
 A_NAME=office
@@ -68,7 +71,10 @@ A_ROUTE_TO_B=192.168.20.0/24
 # Emit an input accept rule for the listen port (always disabled).
 A_FIREWALL=no
 
-# ---- side B ----
+##############################
+# Side B
+##############################
+
 # Router name: goes into the tag, the file names and the peer name.
 # Letters, digits, "_" and "-".
 B_NAME=home
