@@ -185,16 +185,21 @@ dhcp_script() {
     printf '%s' "$raw"
 }
 
+# Locals are kept inside { } blocks: whether /import carries a top-level
+# :local over to the next line is not something to rely on.
+
 # emit_dhcp_check <n>: aborts the import before anything is touched when the
 # DHCP client is missing or already runs a script of its own.
 emit_dhcp_check() {
     local -n iface=WAN$1_IFACE
-    printf ':local dc%s [/ip/dhcp-client find interface="%s"]\n' "$1" "$iface"
-    printf ':if ([:len $dc%s] != 1) do={ :error "%s: expected one DHCP client on %s" }\n' \
-        "$1" "$TAG" "$iface"
-    printf ':local old%s [/ip/dhcp-client get $dc%s script]\n' "$1" "$1"
-    printf ':if ($old%s != "" && !($old%s ~ "%s ")) do={ :error "%s: the DHCP client on %s already has a script, merge it by hand" }\n' \
-        "$1" "$1" "$TAG" "$TAG" "$iface"
+    echo '{'
+    printf '    :local dc [/ip/dhcp-client find interface="%s"]\n' "$iface"
+    printf '    :if ([:len $dc] != 1) do={ :error "%s: expected one DHCP client on %s" }\n' \
+        "$TAG" "$iface"
+    echo '    :local old [/ip/dhcp-client get $dc script]'
+    printf '    :if ($old != "" && !($old ~ "%s ")) do={ :error "%s: the DHCP client on %s already has a script, merge it by hand" }\n' \
+        "$TAG" "$TAG" "$iface"
+    echo '}'
 }
 
 # emit_probe <n>: the /32 that pins the probe to its uplink. With dhcp the
@@ -203,10 +208,12 @@ emit_dhcp_check() {
 emit_probe() {
     local -n name=WAN$1_NAME gw=WAN$1_GATEWAY probe=WAN$1_PROBE iface=WAN$1_IFACE
     if is_dhcp "$1"; then
-        printf ':local gw%s [:tostr [/ip/dhcp-client get $dc%s gateway]]\n' "$1" "$1"
-        printf ':if ([:len $gw%s] = 0) do={ :set gw%s "%s" }\n' "$1" "$1" "$iface"
-        printf '/ip/route add dst-address=%s/32 gateway=$gw%s scope=10 comment="%s probe via %s"\n' \
-            "$probe" "$1" "$TAG" "$name"
+        echo '{'
+        printf '    :local gw [:tostr [/ip/dhcp-client get [find interface="%s"] gateway]]\n' "$iface"
+        printf '    :if ([:len $gw] = 0) do={ :set gw "%s" }\n' "$iface"
+        printf '    /ip/route add dst-address=%s/32 gateway=$gw scope=10 comment="%s probe via %s"\n' \
+            "$probe" "$TAG" "$name"
+        echo '}'
     else
         printf '/ip/route add dst-address=%s/32 gateway=%s scope=10 comment="%s probe via %s"\n' \
             "$probe" "$gw" "$TAG" "$name"
@@ -214,7 +221,7 @@ emit_probe() {
 }
 
 emit_config() {
-    local file=$1 n
+    local file=$1 n iface_var
 
     echo "# Dual-WAN failover on $ROUTER: $WAN1_NAME primary, $WAN2_NAME backup."
     echo "# DualWanB.sh, $(date '+%Y-%m-%d %H:%M:%S %z'). Re-import replaces only"
@@ -255,7 +262,9 @@ emit_config() {
         echo
         echo "# The client stops adding its own default route and keeps the probe"
         echo "# route on the current gateway."
-        printf '/ip/dhcp-client set $dc%s add-default-route=no script="%s"\n' "$n" "$(dhcp_script "$n")"
+        iface_var=WAN${n}_IFACE
+        printf '/ip/dhcp-client set [find interface="%s"] add-default-route=no script="%s"\n' \
+            "${!iface_var}" "$(dhcp_script "$n")"
     done
 
     if is_yes "$MASQUERADE" && [[ $WAN1_IFACE || $WAN2_IFACE ]]; then
@@ -273,10 +282,12 @@ emit_config() {
 
     echo
     echo "# Warn about default routes this file did not add."
-    printf ':local foreign [/ip/route find where dst-address=0.0.0.0/0 and !(comment~"^%s ")]\n' "$TAG"
-    echo ':if ([:len $foreign] > 0) do={'
-    printf '    :log warning "%s: other default routes present, failover will not work"\n' "$TAG"
-    printf '    :put "%s: other default routes present, failover will not work"\n' "$TAG"
+    echo '{'
+    printf '    :local foreign [/ip/route find where dst-address=0.0.0.0/0 and !(comment~"^%s ")]\n' "$TAG"
+    echo '    :if ([:len $foreign] > 0) do={'
+    printf '        :log warning "%s: other default routes present, failover will not work"\n' "$TAG"
+    printf '        :put "%s: other default routes present, failover will not work"\n' "$TAG"
+    echo '    }'
     echo '}'
 
     echo

@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- RouterOS locals in the generated files live inside `{ }` blocks, so nothing relies on `/import` keeping a top-level `:local` between lines.
 - `WAN*_GATEWAY=dhcp` takes over the DHCP client on `WAN*_IFACE`: no own default route, and a lease script that keeps the probe route on the current gateway.
 - The `DualWanB.sh` sample keeps the `add-default-route=no` note as its own block instead of under `ROUTER`.
 - `DualWanB.sh` sample notes that the probe address is reachable only through its uplink.
