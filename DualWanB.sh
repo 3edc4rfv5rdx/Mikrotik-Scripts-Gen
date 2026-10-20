@@ -256,7 +256,8 @@ emit_config() {
 
     echo "# Dual-WAN failover on $ROUTER: $WAN1_NAME primary, $WAN2_NAME backup."
     echo "# DualWanB.sh, $(date '+%Y-%m-%d %H:%M:%S %z'). Re-import replaces only"
-    printf '# objects tagged "%s".\n' "$TAG"
+    printf '# objects tagged "%s"; for the few seconds it takes the router has no\n' "$TAG"
+    echo "# default route, so run it from a console that survives that."
     echo "# Any other default route is left alone, but it breaks the failover: one"
     echo "# with the same distance turns it into ECMP, one with a lower distance wins"
     echo "# outright. A DHCP, PPPoE or LTE client on a WAN adds one unless it has"
