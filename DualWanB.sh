@@ -281,9 +281,10 @@ emit_config() {
     fi
 
     echo
-    echo "# Warn about default routes this file did not add."
+    echo "# Warn about enabled default routes in main this file did not add; other"
+    echo "# tables belong to policy routing and do not compete."
     echo '{'
-    printf '    :local foreign [/ip/route find where dst-address=0.0.0.0/0 and !(comment~"^%s ")]\n' "$TAG"
+    printf '    :local foreign [/ip/route find where dst-address=0.0.0.0/0 and routing-table=main and disabled=no and !(comment~"^%s ")]\n' "$TAG"
     echo '    :if ([:len $foreign] > 0) do={'
     printf '        :log warning "%s: other default routes present, failover will not work"\n' "$TAG"
     printf '        :put "%s: other default routes present, failover will not work"\n' "$TAG"

@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- The foreign default-route warning only counts enabled routes in `main`, so policy-routing tables no longer trigger it.
 - RouterOS locals in the generated files live inside `{ }` blocks, so nothing relies on `/import` keeping a top-level `:local` between lines.
 - `WAN*_GATEWAY=dhcp` takes over the DHCP client on `WAN*_IFACE`: no own default route, and a lease script that keeps the probe route on the current gateway.
 - The `DualWanB.sh` sample keeps the `add-default-route=no` note as its own block instead of under `ROUTER`.
