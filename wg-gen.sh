@@ -379,8 +379,8 @@ emit_side() {
         echo "# The input rule comes in disabled, in front of the defconf drop; if that"
         echo "# rule is not there, it lands at the end of the chain and has to be moved"
         echo "# by hand."
-        echo '# The local stays inside { }: whether /import carries a top-level :local'
-        echo '# over to the next line is not something to rely on.'
+        # The local stays inside { }: whether /import carries a top-level :local
+        # over to the next line is not something to rely on.
         echo '{'
         echo '    :local anchor [/ip/firewall/filter find chain=input action=drop in-interface-list="!LAN"]'
         echo '    :if ([:len $anchor] > 0) do={'
