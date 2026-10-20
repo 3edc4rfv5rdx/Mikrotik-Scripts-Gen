@@ -5,13 +5,14 @@ set -euo pipefail
 OUT_DIR=
 DEFAULT_CONF=./DualWanB.conf
 CONF=
+EXAMPLE=
 
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 
 usage() {
     cat <<'EOF'
 Usage: DualWanB.sh [-o OUTDIR] [CONFIG]
-       DualWanB.sh --example > DualWanB.conf
+       DualWanB.sh --example [CONFIG]
 
 CONFIG defaults to ./DualWanB.conf.
 
@@ -20,7 +21,8 @@ uplinks, plus a remove- file that undoes it.
 
 Options:
   -o, --out DIR   output directory (default: ./out-dualwan-<ROUTER>)
-      --example   print a commented sample config and exit
+      --example   write a commented sample to CONFIG and exit; an existing
+                  CONFIG is moved to CONFIG.bak
   -h, --help      this help
 EOF
 }
@@ -74,7 +76,7 @@ is_yes() { [[ ${1,,} == y* || ${1,,} == true || $1 == 1 ]]; }
 while (( $# )); do
     case $1 in
         -o|--out) [[ ${2-} ]] || die "--out needs a directory"; OUT_DIR=$2; shift 2 ;;
-        --example) print_example; exit 0 ;;
+        --example) EXAMPLE=1; shift ;;
         -h|--help) usage; exit 0 ;;
         -*) die "unknown option: $1" ;;
         *)
@@ -84,6 +86,17 @@ while (( $# )); do
 done
 
 : "${CONF:=$DEFAULT_CONF}"
+
+if [[ $EXAMPLE ]]; then
+    if [[ -e $CONF ]]; then
+        mv -- "$CONF" "$CONF.bak"
+        printf 'moved %s to %s.bak\n' "$CONF" "$CONF" >&2
+    fi
+    print_example > "$CONF"
+    printf 'sample written to %s\n' "$CONF" >&2
+    exit 0
+fi
+
 [[ -f $CONF ]] || die "no such config file: $CONF"
 
 ROUTER= MASQUERADE=no

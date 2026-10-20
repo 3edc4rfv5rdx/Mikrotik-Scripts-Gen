@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- `DualWanB.sh --example` writes the sample to the config file, moving an existing one to `.bak`.
 - `DualWanB.sh` cleanup matches the tag anchored as `^<tag> `, so `home` no longer catches `home2`.
 - `dual-wan-failover.md` explains fail-back, why the probe is the gateway, dropped masquerade sessions and scope in plain words.
 - The sample leaves `A_IFACE`/`B_IFACE` empty, so they default to `wg-<peer name>`.
