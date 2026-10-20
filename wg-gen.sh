@@ -272,15 +272,12 @@ B_PUBLIC_KEY=$(wg_pubkey "$B_PRIVATE_KEY")
 # Each side tags its objects "wg-gen: <own name>-<peer name>".
 tag_of() { printf 'wg-gen: %s-%s' "$1" "$2"; }
 
-# emit_cleanup <tag> <firewall> <routes>: drops everything carrying the tag.
+# emit_cleanup <tag>: drops everything carrying the tag; a remove on an empty
+# find is a no-op.
 emit_cleanup() {
-    local tag=$1 firewall=$2 routes=$3
-    if is_yes "$firewall"; then
-        printf '/ip/firewall/filter remove [find comment~"%s"]\n' "$tag"
-    fi
-    if [[ $routes ]]; then
-        printf '/ip/route remove [find comment~"%s"]\n' "$tag"
-    fi
+    local tag=$1
+    printf '/ip/firewall/filter remove [find comment~"%s"]\n' "$tag"
+    printf '/ip/route remove [find comment~"%s"]\n' "$tag"
     printf '/ip/address remove [find comment~"%s"]\n' "$tag"
     printf '/interface/wireguard/peers remove [find comment~"%s"]\n' "$tag"
     printf '/interface/wireguard remove [find comment~"%s"]\n' "$tag"
@@ -295,8 +292,7 @@ emit_self_remove() {
 # The emitters take the side letters, own first (A B or B A), and read that
 # side's settings through namerefs.
 
-# emit_remove <side> <peer side>: an undo covers every menu, whatever this
-# side was generated with, so emit_cleanup runs with both flags on.
+# emit_remove <side> <peer side>
 emit_remove() {
     local -n name=$1_NAME peer_name=$2_NAME undo=$1_UNDO
     local tag
@@ -307,7 +303,7 @@ emit_remove() {
     echo
     printf ':log info "%s: removing %s configuration";\n' "$tag" "$name"
     echo
-    emit_cleanup "$tag" yes yes
+    emit_cleanup "$tag"
     echo
     echo "# Drop this file once imported."
     emit_self_remove "${undo##*/}"
@@ -331,7 +327,7 @@ emit_side() {
     echo
     printf ':log info "%s: importing %s configuration";\n' "$tag" "$name"
     echo
-    emit_cleanup "$tag" "$firewall" "$route_list"
+    emit_cleanup "$tag"
     echo
 
     echo "/interface/wireguard"

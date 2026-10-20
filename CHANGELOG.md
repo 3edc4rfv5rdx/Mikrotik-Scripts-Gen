@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- The side file always removes every tagged menu, so switching firewall or routes off leaves nothing behind.
 - The emitters take the side letters and read their settings through namerefs instead of 13 positional arguments.
 - Keys are generated through openssl only; the `wg` branch is gone.
 - Dropped the forward accept rules; `*_FIREWALL` now emits only the input rule for the listen port.
