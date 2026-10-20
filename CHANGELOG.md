@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Generated `out-*/` directories are git-ignored, since they hold private keys.
 - Added `DualWanB.sh`: generates the dual-WAN failover `.rsc` (recursive probes, two defaults with `check-gateway=ping`, optional masquerade) plus its undo file.
 - Probe addresses are 8.8.4.4 and 1.0.0.1, in the script and in the note.
 - Separate `removeA-`/`removeB-` files undo an import: they drop every tagged object, whatever the side was generated with.
