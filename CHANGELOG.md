@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Output files carry both names, own first (`sideA-<A>-<B>.rsc`), so a hub router gets one file per tunnel.
 - Cleanup matches the tag anchored as `^<tag> `, so one tunnel no longer catches another whose name extends it.
 - The sample config marks side A and side B with `#` banners.
 - `wg-gen.conf` refreshed to the current sample; `*.bak` is git-ignored.

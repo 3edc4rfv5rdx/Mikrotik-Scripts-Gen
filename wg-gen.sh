@@ -16,9 +16,9 @@ Usage: wg-gen.sh [-o OUTDIR] [CONFIG]
 
 CONFIG defaults to ./wg-gen.conf.
 
-Generates OUTDIR/sideA-<A_NAME>.rsc and OUTDIR/sideB-<B_NAME>.rsc, ready for
-/import on the matching MikroTik router, plus removeA-/removeB- files that
-undo the import.
+Generates OUTDIR/sideA-<A_NAME>-<B_NAME>.rsc and
+OUTDIR/sideB-<B_NAME>-<A_NAME>.rsc, ready for /import on the matching MikroTik
+router, plus removeA-/removeB- files that undo the import.
 
 Options:
   -o, --out DIR   output directory (default: ./out-<A_NAME>-<B_NAME>)
@@ -379,10 +379,12 @@ emit_side() {
 
 : "${OUT_DIR:=./out-$A_NAME-$B_NAME}"
 mkdir -p "$OUT_DIR"
-A_FILE="$OUT_DIR/sideA-$A_NAME.rsc"
-B_FILE="$OUT_DIR/sideB-$B_NAME.rsc"
-A_UNDO="$OUT_DIR/removeA-$A_NAME.rsc"
-B_UNDO="$OUT_DIR/removeB-$B_NAME.rsc"
+# Own name first, then the peer: a router with several tunnels gets one file
+# per tunnel.
+A_FILE="$OUT_DIR/sideA-$A_NAME-$B_NAME.rsc"
+B_FILE="$OUT_DIR/sideB-$B_NAME-$A_NAME.rsc"
+A_UNDO="$OUT_DIR/removeA-$A_NAME-$B_NAME.rsc"
+B_UNDO="$OUT_DIR/removeB-$B_NAME-$A_NAME.rsc"
 
 umask 077
 emit_side A B > "$A_FILE"
