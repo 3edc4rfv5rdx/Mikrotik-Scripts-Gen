@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Repository renamed to Mikrotik-Scripts-Gen; each generator lives in its own folder, `WireGuardGen/` and `DualWanGen/`.
 - A tunnel address that is the network or broadcast address of its subnet is rejected (up to /30).
 - Ports with leading zeros are read as decimal and written to the `.rsc` without them.
 - The note on keeping `:local` inside `{ }` moved from the generated `.rsc` into the generator source.
