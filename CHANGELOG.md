@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Removed `A_CHECK_GATEWAY`/`B_CHECK_GATEWAY`: without a backup path to the same networks they only leak traffic to the default route.
 - The sample config puts a blank line after every parameter.
 - Each side tags its objects with its own name first: `wg-gen: <own>-<peer>`.
 - Shared `PORT` for both sides, with `A_PORT`/`B_PORT` as per-side overrides; every sample parameter is commented.

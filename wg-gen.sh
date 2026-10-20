@@ -72,9 +72,6 @@ A_ENDPOINT=office.example.com
 # into the tunnel. If empty = no routes.
 A_ROUTE_TO_B=192.168.20.0/24
 
-# Add check-gateway=ping to those routes.
-A_CHECK_GATEWAY=no
-
 # Emit input/forward accept rules (always disabled).
 A_FIREWALL=no
 
@@ -98,9 +95,6 @@ B_ENDPOINT=my.home-prov.net
 # Networks behind A, comma-separated (quote if spaced); each becomes a route
 # into the tunnel. If empty = no routes.
 B_ROUTE_TO_A=192.168.10.0/24
-
-# Add check-gateway=ping to those routes.
-B_CHECK_GATEWAY=yes
 
 # Emit input/forward accept rules (always disabled).
 B_FIREWALL=yes
@@ -218,9 +212,9 @@ fi
 KEEPALIVE=25s MTU= PORT=13231
 A_PRIVATE_KEY= B_PRIVATE_KEY= PRESHARED_KEY=
 A_NAME= A_IFACE= A_PORT= A_IPADDR= A_ENDPOINT= A_ROUTE_TO_B=
-A_CHECK_GATEWAY=no A_FIREWALL=no
+A_FIREWALL=no
 B_NAME= B_IFACE= B_PORT= B_IPADDR= B_ENDPOINT= B_ROUTE_TO_A=
-B_CHECK_GATEWAY=no B_FIREWALL=no
+B_FIREWALL=no
 # shellcheck source=/dev/null
 . "$CONF"
 
@@ -332,15 +326,12 @@ emit_remove() {
 
 # emit_side <name> <iface> <privkey> <port> <address> <firewall> \
 #           <peer name> <peer pubkey> <peer ip> <peer endpoint> <peer port> \
-#           <file> <routes> <check-gateway>
+#           <file> <routes>
 emit_side() {
     local name=$1 iface=$2 priv=$3 port=$4 address=$5 firewall=$6
     local peer_name=$7 peer_pub=$8 peer_ip=$9 peer_endpoint=${10} peer_port=${11}
-    local file=${12} check_gw=${14} net extra= tag
+    local file=${12} net tag
     tag=$(tag_of "$name" "$peer_name")
-    if is_yes "$check_gw"; then
-        extra=" check-gateway=ping"
-    fi
     local -a routes
     IFS=, read -ra routes <<<"${13}"
 
@@ -385,8 +376,8 @@ emit_side() {
         for net in "${routes[@]}"; do
             net=${net// /}
             [[ $net ]] || continue
-            printf 'add dst-address=%s gateway=%s%s comment="%s to %s"\n' \
-                "$net" "$peer_ip" "$extra" "$tag" "$peer_name"
+            printf 'add dst-address=%s gateway=%s comment="%s to %s"\n' \
+                "$net" "$peer_ip" "$tag" "$peer_name"
         done
     fi
 
@@ -425,9 +416,9 @@ B_UNDO="$OUT_DIR/removeB-$B_NAME.rsc"
 
 umask 077
 emit_side "$A_NAME" "$A_IFACE" "$A_PRIVATE_KEY" "$A_PORT" "$A_IPADDR" "$A_FIREWALL" \
-    "$B_NAME" "$B_PUBLIC_KEY" "$B_TUNNEL_IP" "$B_ENDPOINT" "$B_PORT" "${A_FILE##*/}" "$A_ROUTE_TO_B" "$A_CHECK_GATEWAY" > "$A_FILE"
+    "$B_NAME" "$B_PUBLIC_KEY" "$B_TUNNEL_IP" "$B_ENDPOINT" "$B_PORT" "${A_FILE##*/}" "$A_ROUTE_TO_B" > "$A_FILE"
 emit_side "$B_NAME" "$B_IFACE" "$B_PRIVATE_KEY" "$B_PORT" "$B_IPADDR" "$B_FIREWALL" \
-    "$A_NAME" "$A_PUBLIC_KEY" "$A_TUNNEL_IP" "$A_ENDPOINT" "$A_PORT" "${B_FILE##*/}" "$B_ROUTE_TO_A" "$B_CHECK_GATEWAY" > "$B_FILE"
+    "$A_NAME" "$A_PUBLIC_KEY" "$A_TUNNEL_IP" "$A_ENDPOINT" "$A_PORT" "${B_FILE##*/}" "$B_ROUTE_TO_A" > "$B_FILE"
 
 emit_remove "$A_NAME" "$B_NAME" "${A_UNDO##*/}" > "$A_UNDO"
 emit_remove "$B_NAME" "$A_NAME" "${B_UNDO##*/}" > "$B_UNDO"
