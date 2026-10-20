@@ -272,21 +272,23 @@ A_PUBLIC_KEY=$(wg_pubkey "$A_PRIVATE_KEY")
 B_PUBLIC_KEY=$(wg_pubkey "$B_PRIVATE_KEY")
 [[ $A_PUBLIC_KEY != "$B_PUBLIC_KEY" ]] || die "both sides ended up with the same key pair"
 
-TAG="wg-gen: $A_NAME-$B_NAME"
-
 # ---------- emitter ----------
 
-# emit_cleanup <firewall> <routes>: drops everything carrying the tag.
+# Each side tags its objects "wg-gen: <own name>-<peer name>".
+tag_of() { printf 'wg-gen: %s-%s' "$1" "$2"; }
+
+# emit_cleanup <tag> <firewall> <routes>: drops everything carrying the tag.
 emit_cleanup() {
-    if is_yes "$1"; then
-        printf '/ip/firewall/filter remove [find comment~"%s"]\n' "$TAG"
+    local tag=$1 firewall=$2 routes=$3
+    if is_yes "$firewall"; then
+        printf '/ip/firewall/filter remove [find comment~"%s"]\n' "$tag"
     fi
-    if [[ $2 ]]; then
-        printf '/ip/route remove [find comment~"%s"]\n' "$TAG"
+    if [[ $routes ]]; then
+        printf '/ip/route remove [find comment~"%s"]\n' "$tag"
     fi
-    printf '/ip/address remove [find comment~"%s"]\n' "$TAG"
-    printf '/interface/wireguard/peers remove [find comment~"%s"]\n' "$TAG"
-    printf '/interface/wireguard remove [find comment~"%s"]\n' "$TAG"
+    printf '/ip/address remove [find comment~"%s"]\n' "$tag"
+    printf '/interface/wireguard/peers remove [find comment~"%s"]\n' "$tag"
+    printf '/interface/wireguard remove [find comment~"%s"]\n' "$tag"
 }
 
 # emit_self_remove <file>: the name is matched by pattern, since on a
@@ -298,13 +300,15 @@ emit_self_remove() {
 # emit_remove <name> <peer name> <file>: an undo covers every menu, whatever
 # this side was generated with, so emit_cleanup runs with both flags on.
 emit_remove() {
+    local tag
+    tag=$(tag_of "$1" "$2")
     echo "# WireGuard site-to-site, $1 side: undo of the $2 tunnel."
     echo "# wg-gen.sh, $(date '+%Y-%m-%d %H:%M:%S %z')."
-    printf '# Removes every object tagged "%s" and nothing else.\n' "$TAG"
+    printf '# Removes every object tagged "%s" and nothing else.\n' "$tag"
     echo
-    printf ':log info "%s: removing %s configuration";\n' "$TAG" "$1"
+    printf ':log info "%s: removing %s configuration";\n' "$tag" "$1"
     echo
-    emit_cleanup yes yes
+    emit_cleanup "$tag" yes yes
     echo
     echo "# Drop this file once imported."
     emit_self_remove "$3"
@@ -316,7 +320,8 @@ emit_remove() {
 emit_side() {
     local name=$1 iface=$2 priv=$3 port=$4 address=$5 firewall=$6
     local peer_name=$7 peer_pub=$8 peer_ip=$9 peer_endpoint=${10} peer_port=${11}
-    local file=${12} check_gw=${14} net extra=
+    local file=${12} check_gw=${14} net extra= tag
+    tag=$(tag_of "$name" "$peer_name")
     if is_yes "$check_gw"; then
         extra=" check-gateway=ping"
     fi
@@ -325,17 +330,17 @@ emit_side() {
 
     echo "# WireGuard site-to-site, $name side (peer: $peer_name)."
     echo "# wg-gen.sh, $(date '+%Y-%m-%d %H:%M:%S %z'). Re-import replaces only"
-    printf '# objects tagged "%s".\n' "$TAG"
+    printf '# objects tagged "%s".\n' "$tag"
     echo
-    printf ':log info "%s: importing %s configuration";\n' "$TAG" "$name"
+    printf ':log info "%s: importing %s configuration";\n' "$tag" "$name"
     echo
-    emit_cleanup "$firewall" "${13}"
+    emit_cleanup "$tag" "$firewall" "${13}"
     echo
 
     echo "/interface/wireguard"
     printf 'add name="%s" listen-port=%s private-key="%s"%s \\\n' \
         "$iface" "$port" "$priv" "${MTU:+ mtu=$MTU}"
-    printf '    comment="%s tunnel to %s"\n' "$TAG" "$peer_name"
+    printf '    comment="%s tunnel to %s"\n' "$tag" "$peer_name"
     echo
 
     echo "/interface/wireguard/peers"
@@ -351,12 +356,12 @@ emit_side() {
             printf ' persistent-keepalive=%s' "$KEEPALIVE"
         fi
     fi
-    printf ' \\\n    comment="%s peer %s"\n' "$TAG" "$peer_name"
+    printf ' \\\n    comment="%s peer %s"\n' "$tag" "$peer_name"
     echo
 
     echo "/ip/address"
     printf 'add interface="%s" address=%s comment="%s tunnel address"\n' \
-        "$iface" "$address" "$TAG"
+        "$iface" "$address" "$tag"
 
     if [[ ${13} ]]; then
         echo
@@ -365,7 +370,7 @@ emit_side() {
             net=${net// /}
             [[ $net ]] || continue
             printf 'add dst-address=%s gateway=%s%s comment="%s to %s"\n' \
-                "$net" "$peer_ip" "$extra" "$TAG" "$peer_name"
+                "$net" "$peer_ip" "$extra" "$tag" "$peer_name"
         done
     fi
 
@@ -374,19 +379,19 @@ emit_side() {
         echo "# Forward rules come in disabled, at the end of the chain."
         echo "/ip/firewall/filter"
         printf 'add chain=forward action=accept in-interface="%s" disabled=yes \\\n' "$iface"
-        printf '    comment="%s forward from %s"\n' "$TAG" "$peer_name"
+        printf '    comment="%s forward from %s"\n' "$tag" "$peer_name"
         printf 'add chain=forward action=accept out-interface="%s" disabled=yes \\\n' "$iface"
-        printf '    comment="%s forward to %s"\n' "$TAG" "$peer_name"
+        printf '    comment="%s forward to %s"\n' "$tag" "$peer_name"
         echo
         echo "# The input rule goes in front of the defconf drop; if that rule is not"
         echo "# there, it lands at the end of the chain and has to be moved by hand."
         echo ':local anchor [/ip/firewall/filter find chain=input action=drop in-interface-list="!LAN"]'
         echo ':if ([:len $anchor] > 0) do={'
         printf '    /ip/firewall/filter add chain=input action=accept protocol=udp dst-port=%s disabled=yes \\\n' "$port"
-        printf '        comment="%s accept wireguard" place-before=[:pick $anchor 0]\n' "$TAG"
+        printf '        comment="%s accept wireguard" place-before=[:pick $anchor 0]\n' "$tag"
         echo '} else={'
         printf '    /ip/firewall/filter add chain=input action=accept protocol=udp dst-port=%s disabled=yes \\\n' "$port"
-        printf '        comment="%s accept wireguard"\n' "$TAG"
+        printf '        comment="%s accept wireguard"\n' "$tag"
         echo '}'
     fi
 

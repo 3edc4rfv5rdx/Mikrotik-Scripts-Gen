@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Each side tags its objects with its own name first: `wg-gen: <own>-<peer>`.
 - Shared `PORT` for both sides, with `A_PORT`/`B_PORT` as per-side overrides; every sample parameter is commented.
 - `--example` writes the sample to the config file, moving an existing one to `.bak`.
 - Generated `out-*/` directories are git-ignored, since they hold private keys.
