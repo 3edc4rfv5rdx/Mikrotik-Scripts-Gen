@@ -33,44 +33,60 @@ print_example() {
     cat <<'EOF'
 # Generator input, sourced by wg-gen.sh: shell quoting applies.
 
-# Keepalive for the dialing side. Empty disables.
+# Keepalive for the dialing side. If empty = no keepalive.
 KEEPALIVE=25s
 
-# Tunnel MTU. Empty keeps the RouterOS default (1420).
+# Tunnel MTU. If empty = RouterOS default (1420).
 MTU=
 
-# Empty private key means generate; fill in to keep an existing tunnel.
+# UDP port for both sides; A_PORT / B_PORT override it per side.
+PORT=13231
+
+# Private keys. If empty = generate; fill in to keep an existing tunnel.
 A_PRIVATE_KEY=
 B_PRIVATE_KEY=
 
-# Empty: no PSK. "auto": generate. Otherwise a key, format-checked.
+# Preshared key. If empty = none; "auto" = generate; otherwise a key, format-checked.
 PRESHARED_KEY=
 
 # ---- side A ----
+# Router name: goes into the tag, the file names and the peer name.
+# Letters, digits, "_" and "-".
 A_NAME=office
+# WireGuard interface on this router. If empty = wg-$B_NAME.
 A_IFACE=wg-home
-A_PORT=13231
-# Tunnel address with prefix.
+# Listen port. If empty = $PORT.
+A_PORT=
+# Tunnel address with prefix, same subnet as B_IPADDR.
 A_IPADDR=10.255.0.1/30
-# Public address. Empty if behind NAT.
+# Public address B dials. Leave empty if behind NAT.
 A_ENDPOINT=office.example.com
-# Networks behind the far side, comma-separated (quote if spaced); each becomes
-# a route dst-address. Empty for none.
+# Networks behind B, comma-separated (quote if spaced); each becomes a route
+# into the tunnel. If empty = no routes.
 A_ROUTE_TO_B=192.168.20.0/24
-# Add check-gateway=ping to the routes.
+# Add check-gateway=ping to those routes.
 A_CHECK_GATEWAY=no
-# Emit input/forward rules.
+# Emit input/forward accept rules (always disabled).
 A_FIREWALL=no
 
 # ---- side B ----
+# Router name: goes into the tag, the file names and the peer name.
+# Letters, digits, "_" and "-".
 B_NAME=home
+# WireGuard interface on this router. If empty = wg-$A_NAME.
 B_IFACE=wg-office
-B_PORT=13231
+# Listen port. If empty = $PORT.
+B_PORT=
+# Tunnel address with prefix, same subnet as A_IPADDR.
 B_IPADDR=10.255.0.2/30
-# Public address. Empty if behind NAT.
+# Public address A dials. Leave empty if behind NAT.
 B_ENDPOINT=my.home-prov.net
+# Networks behind A, comma-separated (quote if spaced); each becomes a route
+# into the tunnel. If empty = no routes.
 B_ROUTE_TO_A=192.168.10.0/24
+# Add check-gateway=ping to those routes.
 B_CHECK_GATEWAY=yes
+# Emit input/forward accept rules (always disabled).
 B_FIREWALL=yes
 EOF
 }
@@ -183,11 +199,11 @@ fi
 
 [[ -f $CONF ]] || die "no such config file: $CONF"
 
-KEEPALIVE=25s MTU=
+KEEPALIVE=25s MTU= PORT=13231
 A_PRIVATE_KEY= B_PRIVATE_KEY= PRESHARED_KEY=
-A_NAME= A_IFACE= A_PORT=13231 A_IPADDR= A_ENDPOINT= A_ROUTE_TO_B=
+A_NAME= A_IFACE= A_PORT= A_IPADDR= A_ENDPOINT= A_ROUTE_TO_B=
 A_CHECK_GATEWAY=no A_FIREWALL=no
-B_NAME= B_IFACE= B_PORT=13231 B_IPADDR= B_ENDPOINT= B_ROUTE_TO_A=
+B_NAME= B_IFACE= B_PORT= B_IPADDR= B_ENDPOINT= B_ROUTE_TO_A=
 B_CHECK_GATEWAY=no B_FIREWALL=no
 # shellcheck source=/dev/null
 . "$CONF"
@@ -226,6 +242,8 @@ for var in A_ROUTE_TO_B B_ROUTE_TO_A; do
     done
 done
 
+: "${A_PORT:=$PORT}"
+: "${B_PORT:=$PORT}"
 for var in A_PORT B_PORT; do
     [[ ${!var} =~ ^[0-9]+$ ]] && (( ${!var} >= 1 && ${!var} <= 65535 )) \
         || die "$var must be a UDP port, got '${!var}'"

@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Shared `PORT` for both sides, with `A_PORT`/`B_PORT` as per-side overrides; every sample parameter is commented.
 - `--example` writes the sample to the config file, moving an existing one to `.bak`.
 - Generated `out-*/` directories are git-ignored, since they hold private keys.
 - Added `DualWanB.sh`: generates the dual-WAN failover `.rsc` (recursive probes, two defaults with `check-gateway=ping`, optional masquerade) plus its undo file.
