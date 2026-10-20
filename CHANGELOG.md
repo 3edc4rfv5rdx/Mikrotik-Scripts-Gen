@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Cleanup matches the tag anchored as `^<tag> `, so one tunnel no longer catches another whose name extends it.
 - The sample config marks side A and side B with `#` banners.
 - `wg-gen.conf` refreshed to the current sample; `*.bak` is git-ignored.
 - Private keys are always generated; `A_PRIVATE_KEY`/`B_PRIVATE_KEY` are gone from the config.

@@ -262,9 +262,10 @@ B_PUBLIC_KEY=$(wg_pubkey "$B_PRIVATE_KEY")
 tag_of() { printf 'wg-gen: %s-%s' "$1" "$2"; }
 
 # emit_cleanup <tag>: drops everything carrying the tag; a remove on an empty
-# find is a no-op.
+# find is a no-op. Every comment is "<tag> <what>", so the match is anchored
+# on both ends of the tag: "x-y" must not catch "x-yz" or "wx-y".
 emit_cleanup() {
-    local tag=$1
+    local tag="^$1 "
     printf '/ip/firewall/filter remove [find comment~"%s"]\n' "$tag"
     printf '/ip/route remove [find comment~"%s"]\n' "$tag"
     printf '/ip/address remove [find comment~"%s"]\n' "$tag"
