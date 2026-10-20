@@ -116,10 +116,12 @@ done
 
 TAG="dualwan: $ROUTER"
 
-# emit_cleanup: drops everything carrying the tag.
+# emit_cleanup: drops everything carrying the tag. Every comment is
+# "<tag> <what>", so the match is anchored on both ends of the tag: "home"
+# must not catch "home2".
 emit_cleanup() {
-    printf '/ip/firewall/nat remove [find comment~"%s"]\n' "$TAG"
-    printf '/ip/route remove [find comment~"%s"]\n' "$TAG"
+    printf '/ip/firewall/nat remove [find comment~"^%s "]\n' "$TAG"
+    printf '/ip/route remove [find comment~"^%s "]\n' "$TAG"
 }
 
 # emit_self_remove <file>: the name is matched by pattern, since on a
