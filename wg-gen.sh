@@ -5,6 +5,7 @@ set -euo pipefail
 OUT_DIR=
 DEFAULT_CONF=./wg-gen.conf
 CONF=
+EXAMPLE=
 
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
@@ -12,7 +13,7 @@ have() { command -v "$1" >/dev/null 2>&1; }
 usage() {
     cat <<'EOF'
 Usage: wg-gen.sh [-o OUTDIR] [CONFIG]
-       wg-gen.sh --example > wg-gen.conf
+       wg-gen.sh --example [CONFIG]
 
 CONFIG defaults to ./wg-gen.conf.
 
@@ -22,7 +23,8 @@ undo the import.
 
 Options:
   -o, --out DIR   output directory (default: ./out-<A_NAME>-<B_NAME>)
-      --example   print a commented sample config and exit
+      --example   write a commented sample to CONFIG and exit; an existing
+                  CONFIG is moved to CONFIG.bak
   -h, --help      this help
 EOF
 }
@@ -158,7 +160,7 @@ wg_pubkey() {
 while (( $# )); do
     case $1 in
         -o|--out) [[ ${2-} ]] || die "--out needs a directory"; OUT_DIR=$2; shift 2 ;;
-        --example) print_example; exit 0 ;;
+        --example) EXAMPLE=1; shift ;;
         -h|--help) usage; exit 0 ;;
         -*) die "unknown option: $1" ;;
         *)
@@ -168,6 +170,17 @@ while (( $# )); do
 done
 
 : "${CONF:=$DEFAULT_CONF}"
+
+if [[ $EXAMPLE ]]; then
+    if [[ -e $CONF ]]; then
+        mv -- "$CONF" "$CONF.bak"
+        printf 'moved %s to %s.bak\n' "$CONF" "$CONF" >&2
+    fi
+    print_example > "$CONF"
+    printf 'sample written to %s\n' "$CONF" >&2
+    exit 0
+fi
+
 [[ -f $CONF ]] || die "no such config file: $CONF"
 
 KEEPALIVE=25s MTU=
