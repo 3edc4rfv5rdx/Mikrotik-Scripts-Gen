@@ -72,7 +72,7 @@ A_ENDPOINT=office.example.com
 # into the tunnel. If empty = no routes.
 A_ROUTE_TO_B=192.168.20.0/24
 
-# Emit input/forward accept rules (always disabled).
+# Emit an input accept rule for the listen port (always disabled).
 A_FIREWALL=no
 
 # ---- side B ----
@@ -96,7 +96,7 @@ B_ENDPOINT=my.home-prov.net
 # into the tunnel. If empty = no routes.
 B_ROUTE_TO_A=192.168.10.0/24
 
-# Emit input/forward accept rules (always disabled).
+# Emit an input accept rule for the listen port (always disabled).
 B_FIREWALL=yes
 EOF
 }
@@ -383,15 +383,9 @@ emit_side() {
 
     if is_yes "$firewall"; then
         echo
-        echo "# Forward rules come in disabled, at the end of the chain."
-        echo "/ip/firewall/filter"
-        printf 'add chain=forward action=accept in-interface="%s" disabled=yes \\\n' "$iface"
-        printf '    comment="%s forward from %s"\n' "$tag" "$peer_name"
-        printf 'add chain=forward action=accept out-interface="%s" disabled=yes \\\n' "$iface"
-        printf '    comment="%s forward to %s"\n' "$tag" "$peer_name"
-        echo
-        echo "# The input rule goes in front of the defconf drop; if that rule is not"
-        echo "# there, it lands at the end of the chain and has to be moved by hand."
+        echo "# The input rule comes in disabled, in front of the defconf drop; if that"
+        echo "# rule is not there, it lands at the end of the chain and has to be moved"
+        echo "# by hand."
         echo ':local anchor [/ip/firewall/filter find chain=input action=drop in-interface-list="!LAN"]'
         echo ':if ([:len $anchor] > 0) do={'
         printf '    /ip/firewall/filter add chain=input action=accept protocol=udp dst-port=%s disabled=yes \\\n' "$port"
