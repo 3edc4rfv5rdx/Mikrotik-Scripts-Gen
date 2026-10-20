@@ -34,34 +34,62 @@ print_example() {
 # Router this belongs to; only names the tag and the files.
 ROUTER=home
 
+# Emit masquerade rules for both uplinks: yes or no (always disabled).
+MASQUERADE=yes
+
 # DHCP, PPPoE and LTE clients on both WANs need add-default-route=no, or their
 # own default route breaks the failover. With GATEWAY=dhcp the generated file
 # sets it itself; any other client needs it by hand.
 
-# ---- WAN 1, primary ----
+##############################
+# WAN 1, primary
+##############################
+
+# Uplink name: goes into the comments of its routes and NAT rule.
 WAN1_NAME=fiber
+
 # Next hop. Ethernet/fibre: the provider's gateway IP. Point-to-point links
 # (LTE, PPPoE, L2TP): the interface name. Pin one to the other as IP%iface.
 # "dhcp": follow the gateway the DHCP client on WAN1_IFACE gets; its script
 # keeps the probe route up to date.
 WAN1_GATEWAY=192.0.2.1
-# Probe address pinned to this uplink. Must differ from the other one. All
+
+# Probe address pinned to this uplink, must differ from WAN2_PROBE. All
 # traffic to it goes only through this uplink, so do not use it as a DNS server.
 WAN1_PROBE=8.8.4.4
+
+# Route distance, must be below WAN2_DISTANCE.
 WAN1_DISTANCE=1
+
 # Uplink interface: masquerade goes out of it, and with GATEWAY=dhcp its DHCP
-# client is the one taken over. Empty skips NAT; not allowed with dhcp.
+# client is the one taken over. If empty = no NAT for this uplink; not allowed
+# with dhcp.
 WAN1_IFACE=ether1
 
-# ---- WAN 2, backup ----
-WAN2_NAME=lte
-WAN2_GATEWAY=lte1
-WAN2_PROBE=1.0.0.1
-WAN2_DISTANCE=2
-WAN2_IFACE=lte1
+##############################
+# WAN 2, backup
+##############################
 
-# Emit masquerade rules; they come in disabled.
-MASQUERADE=yes
+# Uplink name: goes into the comments of its routes and NAT rule.
+WAN2_NAME=lte
+
+# Next hop. Ethernet/fibre: the provider's gateway IP. Point-to-point links
+# (LTE, PPPoE, L2TP): the interface name. Pin one to the other as IP%iface.
+# "dhcp": follow the gateway the DHCP client on WAN2_IFACE gets; its script
+# keeps the probe route up to date.
+WAN2_GATEWAY=lte1
+
+# Probe address pinned to this uplink, must differ from WAN1_PROBE. All
+# traffic to it goes only through this uplink, so do not use it as a DNS server.
+WAN2_PROBE=1.0.0.1
+
+# Route distance, must be above WAN1_DISTANCE.
+WAN2_DISTANCE=2
+
+# Uplink interface: masquerade goes out of it, and with GATEWAY=dhcp its DHCP
+# client is the one taken over. If empty = no NAT for this uplink; not allowed
+# with dhcp.
+WAN2_IFACE=lte1
 EOF
 }
 
