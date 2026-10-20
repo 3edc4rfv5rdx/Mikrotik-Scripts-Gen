@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- `PRESHARED_KEY` replaced by a `PSK=yes|no` flag; a supplied key is no longer accepted.
 - The side file always removes every tagged menu, so switching firewall or routes off leaves nothing behind.
 - The emitters take the side letters and read their settings through namerefs instead of 13 positional arguments.
 - Keys are generated through openssl only; the `wg` branch is gone.

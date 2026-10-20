@@ -47,8 +47,8 @@ A_PRIVATE_KEY=
 # Side B private key. If empty = generate; fill in to keep an existing tunnel.
 B_PRIVATE_KEY=
 
-# Preshared key. If empty = none; "auto" = generate; otherwise a key, format-checked.
-PRESHARED_KEY=
+# Generate a preshared key for the pair: yes or no.
+PSK=no
 
 # ---- side A ----
 # Router name: goes into the tag, the file names and the peer name.
@@ -195,7 +195,7 @@ fi
 [[ -f $CONF ]] || die "no such config file: $CONF"
 
 KEEPALIVE=25s MTU= PORT=13231
-A_PRIVATE_KEY= B_PRIVATE_KEY= PRESHARED_KEY=
+A_PRIVATE_KEY= B_PRIVATE_KEY= PSK=no
 A_NAME= A_IFACE= A_PORT= A_IPADDR= A_ENDPOINT= A_ROUTE_TO_B=
 A_FIREWALL=no
 B_NAME= B_IFACE= B_PORT= B_IPADDR= B_ENDPOINT= B_ROUTE_TO_A=
@@ -256,12 +256,10 @@ for var in A_PRIVATE_KEY B_PRIVATE_KEY; do
         printf -v "$var" '%s' "$(wg_genkey)"
     fi
 done
-case ${PRESHARED_KEY,,} in
-    '') ;;  # no preshared key
-    auto) PRESHARED_KEY=$(wg_genpsk) ;;
-    *) is_wgkey "$PRESHARED_KEY" \
-        || die "PRESHARED_KEY must be empty, 'auto', or a base64-encoded 32-byte key" ;;
-esac
+PRESHARED_KEY=
+if is_yes "$PSK"; then
+    PRESHARED_KEY=$(wg_genpsk)
+fi
 
 A_PUBLIC_KEY=$(wg_pubkey "$A_PRIVATE_KEY")
 B_PUBLIC_KEY=$(wg_pubkey "$B_PRIVATE_KEY")
