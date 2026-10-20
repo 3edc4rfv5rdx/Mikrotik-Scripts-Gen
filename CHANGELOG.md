@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- `dual-wan-failover.md` is now in English, with the Russian original in `dual-wan-failover.ru.md`.
 - Added short README files for the repository and each generator.
 - Repository renamed to Mikrotik-Scripts-Gen; each generator lives in its own folder, `WireGuardGen/` and `DualWanGen/`.
 - A tunnel address that is the network or broadcast address of its subnet is rejected (up to /30).

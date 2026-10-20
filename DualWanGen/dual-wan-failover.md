@@ -1,78 +1,85 @@
-# Два провайдера и один WireGuard-туннель
+# Two uplinks and one WireGuard tunnel
 
-Автоматика не в туннеле, а в WAN-failover: WireGuard идёт по обычной таблице
-маршрутизации и сам уходит через другой аплинк, когда меняется default route.
+**English** · [Русский](dual-wan-failover.ru.md)
 
-## Рецепт
+The automation lives in WAN failover, not in the tunnel: WireGuard follows the
+ordinary routing table and moves to the other uplink by itself when the
+default route changes.
+
+## Recipe
 
 ```
-/ip/route add dst-address=8.8.4.4/32 gateway=<gw-оптики> scope=10
-/ip/route add dst-address=1.0.0.1/32 gateway=<gw-lte>    scope=10
+/ip/route add dst-address=8.8.4.4/32 gateway=<fibre-gw> scope=10
+/ip/route add dst-address=1.0.0.1/32 gateway=<lte-gw>   scope=10
 /ip/route add dst-address=0.0.0.0/0 gateway=8.8.4.4 target-scope=11 distance=1 check-gateway=ping
 /ip/route add dst-address=0.0.0.0/0 gateway=1.0.0.1 target-scope=11 distance=2 check-gateway=ping
 ```
 
-Пробники обязаны быть разные: с одним адресом проверка пойдёт по уже активному
-маршруту и второй канал не проверится никогда.
+The probes must differ: with a single address the check goes over the route
+that is already active, and the second uplink is never checked.
 
-## Кто переключает
+## What does the switching
 
-Сам RouterOS, скрипты и netwatch не нужны. `check-gateway=ping` шлёт ICMP на
-шлюз своего маршрута раз в 10 секунд, таймаут 10 секунд; после двух таймаутов
-подряд маршрут уходит в inactive и активным становится следующий по distance.
-Проверка не прекращается и на неактивном маршруте: первый же ответ возвращает
-его обратно, и трафик сам уходит на основной канал.
+RouterOS itself; no scripts or netwatch are needed. `check-gateway=ping` sends
+ICMP to its route's gateway every 10 seconds with a 10-second timeout; after two
+timeouts in a row the route turns inactive and the next one by distance takes
+over. The check keeps running on the inactive route too: the first reply brings
+it back, and traffic returns to the primary uplink on its own.
 
-Шлюзом default route стоит пробник, а не роутер провайдера: пинг до соседнего
-роутера провайдера проверяет только его, а не интернет за ним. Через пробник
-проверяется реальная связность канала.
+The default route's gateway is the probe, not the provider's router: pinging the
+neighbouring provider router checks only that router, not the internet behind
+it. Going through the probe checks the uplink's real connectivity.
 
-Соединения, установленные через masquerade, при переключении рвутся: меняется
-исходящий адрес. Новые сразу идут через резерв.
+Connections established through masquerade break on a switch, since the source
+address changes. New ones go through the backup right away.
 
-## Путь пакета
+## Path of a packet
 
-Пакет из LAN к 1.2.3.4, оба канала живы:
+A packet from the LAN to 1.2.3.4, both uplinks up:
 
-1. В `main` подходят оба `0.0.0.0/0`; активен тот, у которого distance меньше
-   (оптика), его шлюз — `8.8.4.4`.
-2. `8.8.4.4` не сосед, поэтому роутер ищет маршрут к нему и находит `/32` через
-   шлюз провайдера — это и есть настоящий next hop.
-3. Пакет уходит в интерфейс оптики на MAC шлюза провайдера. Адрес назначения
-   остаётся 1.2.3.4: к 8.8.4.4 он не идёт, тот лишь выбирает next hop.
-4. Masquerade на этом интерфейсе (если включён) подменяет адрес источника.
+1. Both `0.0.0.0/0` routes in `main` match; the one with the lower distance
+   (fibre) is active, and its gateway is `8.8.4.4`.
+2. `8.8.4.4` is not a neighbour, so the router looks up a route to it and finds
+   the `/32` via the provider's gateway: that is the real next hop.
+3. The packet leaves through the fibre interface to the provider gateway's MAC.
+   The destination stays 1.2.3.4: the packet does not go to 8.8.4.4, which only
+   picks the next hop.
+4. Masquerade on that interface, if enabled, rewrites the source address.
 
-Пинг `check-gateway` к 8.8.4.4 идёт тем же `/32`. Два пропуска подряд — default
-через оптику гаснет, и тот же пакет уходит через `1.0.0.1`, то есть в LTE.
+The `check-gateway` ping to 8.8.4.4 takes the same `/32`. Two misses in a row,
+and the default via fibre goes down; the same packet then leaves via `1.0.0.1`,
+that is through LTE.
 
-## scope и target-scope
+## scope and target-scope
 
-Маршрут со `scope` больше, чем `target-scope` у ищущего, не используется для
-резолва next-hop. По умолчанию: connected — 10, статические — 30, динамические —
-40, `target-scope=10` (то есть только через connected). Поэтому пробному `/32`
-ставим `scope=10`, а default route — `target-scope=11`, иначе 8.8.4.4 как шлюз
-не разрешится.
+A route whose `scope` is greater than the searching route's `target-scope` is
+not used to resolve a next hop. Defaults: connected 10, static 30, dynamic 40,
+and `target-scope=10` (connected only). Hence the probe `/32` gets `scope=10`
+and the default route `target-scope=11`; otherwise 8.8.4.4 does not resolve as a
+gateway.
 
-На пальцах: по умолчанию роутер ищет шлюз только среди соседей, то есть адресов
-из сетей, подключённых напрямую. 8.8.4.4 не сосед, поэтому
-`gateway=8.8.4.4` сам по себе unreachable. `scope=10` на `/32` делает этот
-маршрут «почти соседским», а `target-scope=11` разрешает default route искать
-шлюз и через такие маршруты. Итог: интернет — через 8.8.4.4, 8.8.4.4 — через
-оптику, и `check-gateway=ping` пингует уже настоящий интернет.
+In plain words: by default the router looks for a gateway only among its
+neighbours, the addresses in directly connected networks. 8.8.4.4 is not a
+neighbour, so `gateway=8.8.4.4` alone is unreachable. `scope=10` on the `/32`
+makes that route "almost a neighbour", and `target-scope=11` lets the default
+route resolve its gateway through such routes. The result: the internet goes
+via 8.8.4.4, 8.8.4.4 via fibre, and `check-gateway=ping` pings the real
+internet.
 
-## Туннель
+## The tunnel
 
-Настраивать нечего: у стороны с двумя провайдерами меняется исходящий адрес,
-вторая узнаёт новый endpoint из аутентифицированного handshake (roaming),
-`persistent-keepalive=25s` укладывает переключение примерно в полминуты.
+Nothing to set up: the side with two uplinks changes its source address, the
+other side learns the new endpoint from the authenticated handshake (roaming),
+and `persistent-keepalive=25s` keeps the switch to about half a minute.
 
-## Условия
+## Conditions
 
-- Дозваниваться должна сторона с двумя провайдерами — иначе у второй прописан
-  статический `endpoint-address`, неверный после ухода на LTE (лечится DDNS).
-- Masquerade нужен на обоих WAN-интерфейсах.
-- Резерв работает только при разных `distance`; с одинаковыми будет ECMP.
+- The side with two uplinks must be the one that dials; otherwise the other side
+  has a static `endpoint-address` that is wrong after the move to LTE (DDNS
+  fixes that).
+- Masquerade is needed on both WAN interfaces.
+- The backup works only with different `distance` values; equal ones give ECMP.
 
-Источники: [IP Routing](https://help.mikrotik.com/docs/spaces/ROS/pages/328084/IP+Routing),
+Sources: [IP Routing](https://help.mikrotik.com/docs/spaces/ROS/pages/328084/IP+Routing),
 [Using scope and target-scope attributes](https://wiki.mikrotik.com/Manual:Using_scope_and_target-scope_attributes),
-[форум про check-gateway](https://forum.mikrotik.com/t/check-gateway-more-than-each-10s/44969).
+[forum thread on check-gateway](https://forum.mikrotik.com/t/check-gateway-more-than-each-10s/44969).

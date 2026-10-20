@@ -22,4 +22,4 @@ Notes:
   and the import warns about default routes it did not add;
 - masquerade rules are created disabled.
 
-How it works, in Russian: [dual-wan-failover.md](dual-wan-failover.md).
+How it works: [dual-wan-failover.md](dual-wan-failover.md) ([на русском](dual-wan-failover.ru.md)).
