@@ -41,12 +41,6 @@ MTU=
 # UDP port for both sides; A_PORT / B_PORT override it per side.
 PORT=13231
 
-# Side A private key. If empty = generate; fill in to keep an existing tunnel.
-A_PRIVATE_KEY=
-
-# Side B private key. If empty = generate; fill in to keep an existing tunnel.
-B_PRIVATE_KEY=
-
 # Generate a preshared key for the pair: yes or no.
 PSK=no
 
@@ -137,9 +131,6 @@ is_yes() { [[ ${1,,} == y* || ${1,,} == true || $1 == 1 ]]; }
 
 # ---------- key material ----------
 
-# base64 of exactly 32 bytes
-is_wgkey() { [[ $1 =~ ^[A-Za-z0-9+/]{42}[AEIMQUYcgkosw048]=$ ]]; }
-
 hex_to_bin() {
     local hex=$1 i
     for (( i = 0; i < ${#hex}; i += 2 )); do
@@ -195,7 +186,7 @@ fi
 [[ -f $CONF ]] || die "no such config file: $CONF"
 
 KEEPALIVE=25s MTU= PORT=13231
-A_PRIVATE_KEY= B_PRIVATE_KEY= PSK=no
+PSK=no
 A_NAME= A_IFACE= A_PORT= A_IPADDR= A_ENDPOINT= A_ROUTE_TO_B=
 A_FIREWALL=no
 B_NAME= B_IFACE= B_PORT= B_IPADDR= B_ENDPOINT= B_ROUTE_TO_A=
@@ -249,13 +240,8 @@ done
 
 # ---------- key material ----------
 
-for var in A_PRIVATE_KEY B_PRIVATE_KEY; do
-    if [[ ${!var} ]]; then
-        is_wgkey "${!var}" || die "$var is not a base64-encoded 32-byte key"
-    else
-        printf -v "$var" '%s' "$(wg_genkey)"
-    fi
-done
+A_PRIVATE_KEY=$(wg_genkey)
+B_PRIVATE_KEY=$(wg_genkey)
 PRESHARED_KEY=
 if is_yes "$PSK"; then
     PRESHARED_KEY=$(wg_genpsk)
@@ -263,7 +249,6 @@ fi
 
 A_PUBLIC_KEY=$(wg_pubkey "$A_PRIVATE_KEY")
 B_PUBLIC_KEY=$(wg_pubkey "$B_PRIVATE_KEY")
-[[ $A_PUBLIC_KEY != "$B_PUBLIC_KEY" ]] || die "both sides ended up with the same key pair"
 
 # ---------- emitter ----------
 
