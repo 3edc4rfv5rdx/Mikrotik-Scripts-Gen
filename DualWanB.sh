@@ -32,6 +32,8 @@ print_example() {
 # Generator input, sourced by DualWanB.sh: shell quoting applies.
 
 # Router this belongs to; only names the tag and the files.
+# DHCP, PPPoE and LTE clients on both WANs need add-default-route=no, or their
+# own default route breaks the failover.
 ROUTER=home
 
 # ---- WAN 1, primary ----
@@ -149,8 +151,10 @@ emit_config() {
     echo "# Dual-WAN failover on $ROUTER: $WAN1_NAME primary, $WAN2_NAME backup."
     echo "# DualWanB.sh, $(date '+%Y-%m-%d %H:%M:%S %z'). Re-import replaces only"
     printf '# objects tagged "%s".\n' "$TAG"
-    echo "# The router's own default route is left alone; drop it by hand if it"
-    echo "# duplicates the ones below."
+    echo "# Any other default route is left alone, but it breaks the failover: one"
+    echo "# with the same distance turns it into ECMP, one with a lower distance wins"
+    echo "# outright. A DHCP, PPPoE or LTE client on a WAN adds one unless it has"
+    echo "# add-default-route=no; the end of this file warns if one is found."
     echo
     printf ':log info "%s: importing";\n' "$TAG"
     echo
@@ -183,6 +187,14 @@ emit_config() {
             printf '    comment="%s nat %s"\n' "$TAG" "${name%%:*}"
         done
     fi
+
+    echo
+    echo "# Warn about default routes this file did not add."
+    printf ':local foreign [/ip/route find where dst-address=0.0.0.0/0 and !(comment~"^%s ")]\n' "$TAG"
+    echo ':if ([:len $foreign] > 0) do={'
+    printf '    :log warning "%s: other default routes present, failover will not work"\n' "$TAG"
+    printf '    :put "%s: other default routes present, failover will not work"\n' "$TAG"
+    echo '}'
 
     echo
     echo "# Drop this file once imported."
