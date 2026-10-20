@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- `DualWanB.sh` waits 2s before the foreign default-route check when it took over a DHCP client, so its vanishing route is not reported.
 - `DualWanB.sh` refuses the same interface for both uplinks.
 - The `DualWanB.sh` sample comments every parameter, spaces them out and marks WAN 1 / WAN 2 with banners.
 - The `DualWanB.sh` undo finds taken-over DHCP clients by the tag in their script, whatever the current config says.

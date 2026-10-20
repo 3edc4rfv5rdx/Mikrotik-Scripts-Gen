@@ -314,6 +314,11 @@ emit_config() {
     echo
     echo "# Warn about enabled default routes in main this file did not add; other"
     echo "# tables belong to policy routing and do not compete."
+    if is_dhcp 1 || is_dhcp 2; then
+        echo "# A client just switched to add-default-route=no may take a moment to"
+        echo "# drop its dynamic route; without the pause it would be reported."
+        echo ':delay 2s'
+    fi
     echo '{'
     printf '    :local foreign [/ip/route find where dst-address=0.0.0.0/0 and routing-table=main and disabled=no and !(comment~"^%s ")]\n' "$TAG"
     echo '    :if ([:len $foreign] > 0) do={'
