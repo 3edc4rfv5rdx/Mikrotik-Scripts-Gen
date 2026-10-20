@@ -301,7 +301,8 @@ emit_remove() {
 
     echo "# Dual-WAN failover on $ROUTER: undo."
     echo "# DualWanB.sh, $(date '+%Y-%m-%d %H:%M:%S %z')."
-    printf '# Removes every object tagged "%s" and nothing else.\n' "$TAG"
+    printf '# Removes every object tagged "%s", gives any DHCP client it took over\n' "$TAG"
+    echo "# its default route back, and touches nothing else."
     echo
     printf ':log info "%s: removing";\n' "$TAG"
     echo
