@@ -122,6 +122,13 @@ is_cidr() {
     (( prefix >= 0 && prefix <= 32 ))
 }
 
+# Address as an integer, prefix ignored.
+cidr_ip_int() {
+    local IFS=. a b c d
+    read -r a b c d <<<"${1%/*}"
+    echo $(( (a << 24) | (b << 16) | (c << 8) | d ))
+}
+
 # Network address as an integer.
 cidr_net_int() {
     local IFS=. a b c d prefix=${1#*/} mask
@@ -226,6 +233,16 @@ B_TUNNEL_IP=${B_IPADDR%/*}
 [[ ${A_IPADDR#*/} == "${B_IPADDR#*/}" && \
    $(cidr_net_int "$A_IPADDR") == "$(cidr_net_int "$B_IPADDR")" ]] \
     || die "A_IPADDR and B_IPADDR must sit in the same subnet"
+
+# Up to /30 the first and last address are the network and the broadcast;
+# /31 and /32 have no such pair.
+for var in A_IPADDR B_IPADDR; do
+    prefix=$(( 10#${!var#*/} ))
+    (( prefix <= 30 )) || continue
+    host=$(( $(cidr_ip_int "${!var}") - $(cidr_net_int "${!var}") ))
+    (( host > 0 && host < (1 << (32 - prefix)) - 1 )) \
+        || die "$var is the network or broadcast address of its subnet: ${!var}"
+done
 
 for var in A_ROUTE_TO_B B_ROUTE_TO_A; do
     IFS=, read -ra nets <<<"${!var}"
