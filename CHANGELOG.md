@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Keys are generated through openssl only; the `wg` branch is gone.
 - Dropped the forward accept rules; `*_FIREWALL` now emits only the input rule for the listen port.
 - Removed `A_CHECK_GATEWAY`/`B_CHECK_GATEWAY`: without a backup path to the same networks they only leak traffic to the default route.
 - The sample config puts a blank line after every parameter.

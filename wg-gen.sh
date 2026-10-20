@@ -8,7 +8,6 @@ CONF=
 EXAMPLE=
 
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
-have() { command -v "$1" >/dev/null 2>&1; }
 
 usage() {
     cat <<'EOF'
@@ -149,36 +148,22 @@ hex_to_bin() {
 }
 
 wg_genkey() {
-    if have wg; then
-        wg genkey
-    else
-        openssl genpkey -algorithm X25519 \
-            | openssl pkey -inform PEM -outform DER \
-            | tail -c 32 | base64 | tr -d '\n'
-    fi
+    openssl genpkey -algorithm X25519 \
+        | openssl pkey -inform PEM -outform DER \
+        | tail -c 32 | base64 | tr -d '\n'
 }
 
-wg_genpsk() {
-    if have wg; then
-        wg genpsk
-    else
-        openssl rand -base64 32 | tr -d '\n'
-    fi
-}
+wg_genpsk() { openssl rand -base64 32 | tr -d '\n'; }
 
 # PKCS#8 DER header for a raw 32-byte X25519 scalar.
 X25519_PKCS8_HEADER=302e020100300506032b656e04220420
 
 wg_pubkey() {
-    local priv=$1 hex
-    if have wg; then
-        printf '%s' "$priv" | wg pubkey
-    else
-        hex=$(printf '%s' "$priv" | base64 -d | od -An -v -tx1 | tr -d ' \n')
-        hex_to_bin "${X25519_PKCS8_HEADER}${hex}" \
-            | openssl pkey -inform DER -pubout -outform DER \
-            | tail -c 32 | base64 | tr -d '\n'
-    fi
+    local hex
+    hex=$(printf '%s' "$1" | base64 -d | od -An -v -tx1 | tr -d ' \n')
+    hex_to_bin "${X25519_PKCS8_HEADER}${hex}" \
+        | openssl pkey -inform DER -pubout -outform DER \
+        | tail -c 32 | base64 | tr -d '\n'
 }
 
 # ---------- arguments ----------
