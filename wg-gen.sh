@@ -292,33 +292,38 @@ emit_self_remove() {
     printf '/file remove [find name~"%s"]\n' "$1"
 }
 
-# emit_remove <name> <peer name> <file>: an undo covers every menu, whatever
-# this side was generated with, so emit_cleanup runs with both flags on.
+# The emitters take the side letters, own first (A B or B A), and read that
+# side's settings through namerefs.
+
+# emit_remove <side> <peer side>: an undo covers every menu, whatever this
+# side was generated with, so emit_cleanup runs with both flags on.
 emit_remove() {
+    local -n name=$1_NAME peer_name=$2_NAME undo=$1_UNDO
     local tag
-    tag=$(tag_of "$1" "$2")
-    echo "# WireGuard site-to-site, $1 side: undo of the $2 tunnel."
+    tag=$(tag_of "$name" "$peer_name")
+    echo "# WireGuard site-to-site, $name side: undo of the $peer_name tunnel."
     echo "# wg-gen.sh, $(date '+%Y-%m-%d %H:%M:%S %z')."
     printf '# Removes every object tagged "%s" and nothing else.\n' "$tag"
     echo
-    printf ':log info "%s: removing %s configuration";\n' "$tag" "$1"
+    printf ':log info "%s: removing %s configuration";\n' "$tag" "$name"
     echo
     emit_cleanup "$tag" yes yes
     echo
     echo "# Drop this file once imported."
-    emit_self_remove "$3"
+    emit_self_remove "${undo##*/}"
 }
 
-# emit_side <name> <iface> <privkey> <port> <address> <firewall> \
-#           <peer name> <peer pubkey> <peer ip> <peer endpoint> <peer port> \
-#           <file> <routes>
+# emit_side <side> <peer side>
 emit_side() {
-    local name=$1 iface=$2 priv=$3 port=$4 address=$5 firewall=$6
-    local peer_name=$7 peer_pub=$8 peer_ip=$9 peer_endpoint=${10} peer_port=${11}
-    local file=${12} net tag
+    local -n name=$1_NAME iface=$1_IFACE priv=$1_PRIVATE_KEY port=$1_PORT
+    local -n address=$1_IPADDR firewall=$1_FIREWALL file=$1_FILE
+    local -n route_list=$1_ROUTE_TO_$2
+    local -n peer_name=$2_NAME peer_pub=$2_PUBLIC_KEY peer_ip=$2_TUNNEL_IP
+    local -n peer_endpoint=$2_ENDPOINT peer_port=$2_PORT
+    local net tag
     tag=$(tag_of "$name" "$peer_name")
     local -a routes
-    IFS=, read -ra routes <<<"${13}"
+    IFS=, read -ra routes <<<"$route_list"
 
     echo "# WireGuard site-to-site, $name side (peer: $peer_name)."
     echo "# wg-gen.sh, $(date '+%Y-%m-%d %H:%M:%S %z'). Re-import replaces only"
@@ -326,7 +331,7 @@ emit_side() {
     echo
     printf ':log info "%s: importing %s configuration";\n' "$tag" "$name"
     echo
-    emit_cleanup "$tag" "$firewall" "${13}"
+    emit_cleanup "$tag" "$firewall" "$route_list"
     echo
 
     echo "/interface/wireguard"
@@ -355,7 +360,7 @@ emit_side() {
     printf 'add interface="%s" address=%s comment="%s tunnel address"\n' \
         "$iface" "$address" "$tag"
 
-    if [[ ${13} ]]; then
+    if [[ $route_list ]]; then
         echo
         echo "/ip/route"
         for net in "${routes[@]}"; do
@@ -383,7 +388,7 @@ emit_side() {
 
     echo
     echo "# The file holds the private key, drop it once imported."
-    emit_self_remove "$file"
+    emit_self_remove "${file##*/}"
 }
 
 : "${OUT_DIR:=./out-$A_NAME-$B_NAME}"
@@ -394,13 +399,10 @@ A_UNDO="$OUT_DIR/removeA-$A_NAME.rsc"
 B_UNDO="$OUT_DIR/removeB-$B_NAME.rsc"
 
 umask 077
-emit_side "$A_NAME" "$A_IFACE" "$A_PRIVATE_KEY" "$A_PORT" "$A_IPADDR" "$A_FIREWALL" \
-    "$B_NAME" "$B_PUBLIC_KEY" "$B_TUNNEL_IP" "$B_ENDPOINT" "$B_PORT" "${A_FILE##*/}" "$A_ROUTE_TO_B" > "$A_FILE"
-emit_side "$B_NAME" "$B_IFACE" "$B_PRIVATE_KEY" "$B_PORT" "$B_IPADDR" "$B_FIREWALL" \
-    "$A_NAME" "$A_PUBLIC_KEY" "$A_TUNNEL_IP" "$A_ENDPOINT" "$A_PORT" "${B_FILE##*/}" "$B_ROUTE_TO_A" > "$B_FILE"
-
-emit_remove "$A_NAME" "$B_NAME" "${A_UNDO##*/}" > "$A_UNDO"
-emit_remove "$B_NAME" "$A_NAME" "${B_UNDO##*/}" > "$B_UNDO"
+emit_side A B > "$A_FILE"
+emit_side B A > "$B_FILE"
+emit_remove A B > "$A_UNDO"
+emit_remove B A > "$B_UNDO"
 
 # Keep the input next to what it produced.
 if [[ $(readlink -f "$CONF") != $(readlink -f "$OUT_DIR/${CONF##*/}") ]]; then
