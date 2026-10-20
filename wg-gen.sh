@@ -61,7 +61,8 @@ A_PORT=
 # Tunnel address with prefix, same subnet as B_IPADDR.
 A_IPADDR=10.255.0.1/30
 
-# Public address B dials. Leave empty if behind NAT.
+# Public address of the side A router itself; B dials it.
+# Leave empty if behind NAT.
 A_ENDPOINT=office.example.com
 
 # Networks behind B, comma-separated (quote if spaced); each becomes a route
@@ -88,7 +89,8 @@ B_PORT=
 # Tunnel address with prefix, same subnet as A_IPADDR.
 B_IPADDR=10.255.0.2/30
 
-# Public address A dials. Leave empty if behind NAT.
+# Public address of the side B router itself; A dials it.
+# Leave empty if behind NAT.
 B_ENDPOINT=my.home-prov.net
 
 # Networks behind A, comma-separated (quote if spaced); each becomes a route

@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Endpoint comments in the sample say whose address it is: the router itself, dialled by the peer.
 - `*_ENDPOINT`, `MTU` and `KEEPALIVE` are validated before generation instead of failing at `/import`.
 - Output files carry both names, own first (`sideA-<A>-<B>.rsc`), so a hub router gets one file per tunnel.
 - Cleanup matches the tag anchored as `^<tag> `, so one tunnel no longer catches another whose name extends it.
