@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- `wg-gen.conf` refreshed to the current sample; `*.bak` is git-ignored.
 - Private keys are always generated; `A_PRIVATE_KEY`/`B_PRIVATE_KEY` are gone from the config.
 - `PRESHARED_KEY` replaced by a `PSK=yes|no` flag; a supplied key is no longer accepted.
 - The side file always removes every tagged menu, so switching firewall or routes off leaves nothing behind.
