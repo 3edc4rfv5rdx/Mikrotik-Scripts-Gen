@@ -42,8 +42,10 @@ MTU=
 # UDP port for both sides; A_PORT / B_PORT override it per side.
 PORT=13231
 
-# Private keys. If empty = generate; fill in to keep an existing tunnel.
+# Side A private key. If empty = generate; fill in to keep an existing tunnel.
 A_PRIVATE_KEY=
+
+# Side B private key. If empty = generate; fill in to keep an existing tunnel.
 B_PRIVATE_KEY=
 
 # Preshared key. If empty = none; "auto" = generate; otherwise a key, format-checked.
@@ -53,19 +55,26 @@ PRESHARED_KEY=
 # Router name: goes into the tag, the file names and the peer name.
 # Letters, digits, "_" and "-".
 A_NAME=office
+
 # WireGuard interface on this router. If empty = wg-$B_NAME.
 A_IFACE=wg-home
+
 # Listen port. If empty = $PORT.
 A_PORT=
+
 # Tunnel address with prefix, same subnet as B_IPADDR.
 A_IPADDR=10.255.0.1/30
+
 # Public address B dials. Leave empty if behind NAT.
 A_ENDPOINT=office.example.com
+
 # Networks behind B, comma-separated (quote if spaced); each becomes a route
 # into the tunnel. If empty = no routes.
 A_ROUTE_TO_B=192.168.20.0/24
+
 # Add check-gateway=ping to those routes.
 A_CHECK_GATEWAY=no
+
 # Emit input/forward accept rules (always disabled).
 A_FIREWALL=no
 
@@ -73,19 +82,26 @@ A_FIREWALL=no
 # Router name: goes into the tag, the file names and the peer name.
 # Letters, digits, "_" and "-".
 B_NAME=home
+
 # WireGuard interface on this router. If empty = wg-$A_NAME.
 B_IFACE=wg-office
+
 # Listen port. If empty = $PORT.
 B_PORT=
+
 # Tunnel address with prefix, same subnet as A_IPADDR.
 B_IPADDR=10.255.0.2/30
+
 # Public address A dials. Leave empty if behind NAT.
 B_ENDPOINT=my.home-prov.net
+
 # Networks behind A, comma-separated (quote if spaced); each becomes a route
 # into the tunnel. If empty = no routes.
 B_ROUTE_TO_A=192.168.10.0/24
+
 # Add check-gateway=ping to those routes.
 B_CHECK_GATEWAY=yes
+
 # Emit input/forward accept rules (always disabled).
 B_FIREWALL=yes
 EOF
